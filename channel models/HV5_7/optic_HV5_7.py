@@ -28,7 +28,7 @@ H_TURB_TOP = 30e3        # טווח גבהים עם טורבולנציה [m]
 
 # אופטיקה
 LAM        = 1550e-9     # אורך גל [m]
-
+LAM_STR=str(LAM*10**9)+"nm" #אורך הגל לפרסום-שמי 
 # פרופיל HV5/7 (יבשתי) + von-Kármán
 HV57_A     = 1.7e-14     # ground term [m^(-2/3)]
 HV57_V     = 21.0        # RMS wind [m/s]
@@ -50,8 +50,8 @@ DT_BASELINE  = 0.20
 DR_BASELINE  = 0.20
 
 # שמות קבצים
-FIG_A1 = "A1_ps_calibrated"+str(LAM)+".png"
-FIG_A2 = "A2_ps_calibrated.png"
+FIG_A1 = "A1_ps_calibrated"+str(LAM_STR)+".png"
+FIG_A2 = "A2_ps_calibrated"+str(LAM_STR)+".png"
 
 # ===================== נגזרות וחישוב מקדים =====================
 
