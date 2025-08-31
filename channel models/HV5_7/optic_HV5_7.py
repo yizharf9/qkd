@@ -28,7 +28,7 @@ H_TURB_TOP = 30e3        # טווח גבהים עם טורבולנציה [m]
 
 # אופטיקה
 LAM        = 1550e-9     # אורך גל [m]
-LAM_STR=str(LAM*10**9)+"nm" #אורך הגל לפרסום-שמי 
+LAM_str=str(int(LAM*10**9))+"nm"
 # פרופיל HV5/7 (יבשתי) + von-Kármán
 HV57_A     = 1.7e-14     # ground term [m^(-2/3)]
 HV57_V     = 21.0        # RMS wind [m/s]
@@ -50,9 +50,8 @@ DT_BASELINE  = 0.20
 DR_BASELINE  = 0.20
 
 # שמות קבצים
-FIG_A1 = "A1_ps_calibrated"+str(LAM_STR)+".png"
-FIG_A2 = "A2_ps_calibrated"+str(LAM_STR)+".png"
-
+FIG_A1 = "TRANS_ps_calibrated_"+str(LAM_str)+".png"
+FIG_A2 = "RECIEVE_ps_calibrated_"+str(LAM_str)+".png"
 # ===================== נגזרות וחישוב מקדים =====================
 
 k = 2.0 * pi / LAM
@@ -162,8 +161,9 @@ def main():
         A1_vac.append (eta_propagate(DT, DR_BASELINE, False, Cn2_layers, dz_s, seed0=2025))
         A1_turb.append(eta_propagate(DT, DR_BASELINE, True,  Cn2_layers, dz_s, seed0=2025))
 
+    #plt.figure()
+    #plt.plot(A1_Area, A1_vac,  'o-', label='Vacuum (propagated)')
     plt.figure()
-    plt.plot(A1_Area, A1_vac,  'o-', label='Vacuum (propagated)')
     plt.plot(A1_Area, A1_turb, 's--', label='Turbulence (phase screens)')
     plt.xlabel("Transmitter area A_T [m²]")
     plt.ylabel("Received fraction η (P_R / P_T)")
@@ -178,8 +178,8 @@ def main():
         A2_vac.append (eta_propagate(DT_BASELINE, DR, False, Cn2_layers, dz_s, seed0=777))
         A2_turb.append(eta_propagate(DT_BASELINE, DR, True,  Cn2_layers, dz_s, seed0=777))
 
-    plt.figure()
-    plt.plot(A2_Area, A2_vac,  'o-', label='Vacuum (propagated)')
+    #plt.figure()
+    #plt.plot(A2_Area, A2_vac,  'o-', label='Vacuum (propagated)')
     plt.figure()
     plt.plot(A2_Area, A2_turb, 's--', label='Turbulence (phase screens)')
     plt.xlabel("Receiver area A_R [m²]")
@@ -187,7 +187,6 @@ def main():
     plt.title(f"A2: η vs Rx area  |  L~{L_TOTAL/1e3:.0f} km, elev {ELEV_DEG}°, λ={LAM*1e9:.0f} nm")
     plt.grid(True); plt.legend(); plt.tight_layout()
     plt.savefig(FIG_A2, dpi=150)
-
     print(f"Done. Wrote {FIG_A1} and {FIG_A2}")
 
 if __name__ == "__main__":
