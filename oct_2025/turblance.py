@@ -23,12 +23,22 @@ except Exception as e:
     raise ImportError("HCIPy is required. Install it with: pip install hcipy") from e
 
 # ----------------------------- Parameters -----------------------------
-wavelength = 0.5e-6  # 1 micron
+try:
+    run_number
+except NameError:
+    run_number= 1
+try:
+    wavelength
+except NameError:
+    wavelength = 0.5e-6  # 1 micronx
 num_pupil_pixels = 256
 telescope_diameter = 8.0  # example for an 8-meter telescope like VLT
 
 # Turbulence parameters (layer 1)
-r0 = 0.15          # Fried parameter (m)
+try:
+    r0
+except NameError:
+    r0 = 0.15          # Fried parameter (m)
 L0 = 25.0          # outer scale (m)
 Cn2_layer = Cn_squared_from_fried_parameter(r0, wavelength) if 'Cn_squared_from_fried_parameter' in globals() else None
 velocity = (10.0, 0.0)  # m/s horizontal wind
@@ -44,7 +54,7 @@ fiber_NA = 0.13
 fiber_length = 10.0
 
 # Output folder
-output_dir = 'simulation_output'
+output_dir = 'simulation_output_'+f"wavelength_{wavelength*1e6:.2f}um_"+f"r0_{r0*1e3:.1f}mm_"+f"run_{run_number}"
 os.makedirs(output_dir, exist_ok=True)
 
 # ----------------------------- Helper plotting -----------------------------
