@@ -31,7 +31,7 @@ except NameError:
 try:
     wavelength
 except NameError:
-    wavelength = 0.5e-6  # 1 micronx
+    wavelength = 1234e-7  # 1 micronx
 num_pupil_pixels = 256
 telescope_diameter = 8.0  # example for an 8-meter telescope like VLT
 
