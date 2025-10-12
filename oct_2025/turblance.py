@@ -181,7 +181,7 @@ def update_csv(wavelength,r0,run_number,single_mode_power,multi_mode_power):
 
     # Define the file path and column names
     file_path = "./massive_output.csv"
-    columns = ["wavelength", "r0", "run_number", "single_mode_power", "multi_mode_power"]
+    columns = ["wavelength", "r0", "run_number", "single_mode_power", "multi_mode_power","time"]
 
     # Create a new DataFrame row from your variables
     # Note: The values are placed in a list.
