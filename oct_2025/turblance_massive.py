@@ -21,12 +21,12 @@ for wavelength in [1.55e-6, 0.500e-6] :
     for r0 in r0_list :
         for run_number in range(1, 5):
             ns = {
-                "__name__": "__main__",
-                "__file__": str(path_for_run),   # so Path(__file__) works inside turblance.py
-                "run_number": run_number,
-                "wavelength": wavelength,
-                "r0": r0,  # example value for r0
-            }
+                    "__name__": "__main__",
+                    "__file__": str(path_for_run),   # so Path(__file__) works inside turblance.py
+                    "run_number": run_number,
+                    "wavelength": wavelength,
+                    "r0": r0,  # example value for r0
+                }
 
-    print(f"\n=== run_number={run_number} ===")
-    exec(code_obj, ns)  # fresh globals per run (no locals dict)
+            print(f"\n=== run_number={run_number} ===")
+            exec(code_obj, ns)  # fresh globals per run (no locals dict)
