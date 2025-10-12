@@ -16,6 +16,7 @@ Run:
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import datetime
 
 try:
     from hcipy import *
@@ -135,6 +136,9 @@ single_mode_fiber = StepIndexFiber(singlemode_fiber_core_radius, fiber_NA, fiber
 wf_mmf = multi_mode_fiber.forward(wf_foc)
 wf_smf = single_mode_fiber.forward(wf_foc)
 
+single_mode_power = wf_mmf.total_power
+multi_mode_power = wf_smf.total_power
+
 print(f'Multi-mode fiber throughput: {wf_mmf.total_power:.6f}')
 print(f'Single-mode fiber throughput: {wf_smf.total_power:.6f}')
 
@@ -157,3 +161,53 @@ plt.savefig(fiber_output_path, dpi=300)
 plt.close()
 
 print('\nSimulation complete. All images saved to the simulation_output folder.')
+
+
+
+
+
+def update_csv(wavelength,r0,run_number,single_mode_power,multi_mode_power):
+    import pandas as pd
+    import os
+
+    # --- Define your variables with the new values ---
+    # (These would be calculated or defined elsewhere in your code)
+    wavelength = 1550 # in nm
+    r0 = 0.15         # Fried parameter in meters
+    run_number = 42
+    single_mode_power = 0.0025 # in Watts
+    multi_mode_power = 0.011   # in Watts
+    # -------------------------------------------------
+
+    # Define the file path and column names
+    file_path = "./massive_output.csv"
+    columns = ["wavelength", "r0", "run_number", "single_mode_power", "multi_mode_power"]
+
+    # Create a new DataFrame row from your variables
+    # Note: The values are placed in a list.
+    new_row_df = pd.DataFrame([{
+        "wavelength": wavelength,
+        "r0": r0,
+        "run_number": run_number,
+        "single_mode_power": single_mode_power,
+        "multi_mode_power": multi_mode_power,
+        "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }])
+
+    # Check if the file already exists
+    if os.path.exists(file_path):
+        print(f"File '{file_path}' found. Appending new data...")
+        # Append the new row to the existing file without writing the header
+        new_row_df.to_csv(file_path, mode='a', header=False, index=False)
+    else:
+        print(f"File '{file_path}' not found. Creating a new file...")
+        # Create a new file and write the new row, including the header
+        new_row_df.to_csv(file_path, mode='w', header=columns, index=False)
+
+    print("Operation complete. Data has been saved.")
+
+    # Optional: You can read and print the file's content to verify
+    # print("\nCurrent file content:")
+    # print(pd.read_csv(file_path))
+    
+update_csv(wavelength,r0,run_number,single_mode_power,multi_mode_power)
