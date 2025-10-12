@@ -170,15 +170,6 @@ def update_csv(wavelength,r0,run_number,single_mode_power,multi_mode_power):
     import pandas as pd
     import os
 
-    # --- Define your variables with the new values ---
-    # (These would be calculated or defined elsewhere in your code)
-    wavelength = 1550 # in nm
-    r0 = 0.15         # Fried parameter in meters
-    run_number = 42
-    single_mode_power = 0.0025 # in Watts
-    multi_mode_power = 0.011   # in Watts
-    # -------------------------------------------------
-
     # Define the file path and column names
     file_path = "./massive_output.csv"
     columns = ["wavelength", "r0", "run_number", "single_mode_power", "multi_mode_power","time"]
