@@ -16,7 +16,9 @@ Run:
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import datetime as dt
 import datetime
+import time
 
 try:
     from hcipy import *
@@ -27,19 +29,21 @@ except Exception as e:
 try:
     run_number
 except NameError:
-    run_number= 1
+    run_number= 0
 try:
     wavelength
 except NameError:
-    wavelength = 1.55e-6  # 1 micronx
+    wavelength = 1234-6  # 1 micronx
+try:
+    r0_ref
+/except NameError:
+    r0_ref = 0.2 
 num_pupil_pixels = 256
 telescope_diameter = 8.0  # example for an 8-meter telescope like VLT
 
 # Turbulence parameters (layer 1)
-try:
-    r0_ref
-except NameError:
-    r0_ref = 0.2 
+
+
 lambda_ref = 0.5e-6        # Fried parameter (m)
 r0 = r0_ref * (wavelength / lambda_ref) ** (6.0 / 5.0)
 L0 = 25.0
@@ -62,7 +66,7 @@ V_target = 2.0
 singlemode_fiber_core_radius = (V_target * wavelength) / (2 * np.pi * fiber_NA)
 
 # Output folder
-output_dir = 'simulation_output_'+f"wavelength_{wavelength*1e6:.2f}um_"+f"r0_{r0*1e3:.1f}mm_"+f"run_{run_number}"
+output_dir = 'simulation_output_'+f"wavelength_{wavelength*1e6:.2f}um_"+f"r0_ref={r0*10e3:.1f}mm_"+f"run_{run_number}"
 os.makedirs(output_dir, exist_ok=True)
 
 # ----------------------------- Helper plotting -----------------------------
@@ -208,4 +212,4 @@ def update_csv(wavelength,r0,run_number,single_mode_power,multi_mode_power):
     # print("\nCurrent file content:")
     # print(pd.read_csv(file_path))
     
-update_csv(wavelength,r0,run_number,single_mode_power,multi_mode_power)
+update_csv(wavelength,r0_ref,run_number,single_mode_power,multi_mode_power)

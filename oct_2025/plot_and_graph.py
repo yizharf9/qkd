@@ -8,7 +8,9 @@ df = pd.read_csv(path_file)
 print(f"Loaded {len(df)} rows from {path_file}")
 # --- 2) Normalize column names (robust to spaces/case) ---
 df.columns = df.columns.str.strip().str.lower()
-
+print(df.columns)
+df=df[df["wavelength"]<6e-7]
+print(f"Loaded {len(df)} rows from {path_file}")
 def pick(colnames, *candidates):
     for c in candidates:
         if c in colnames:
@@ -20,6 +22,7 @@ def pick(colnames, *candidates):
 
 # --- 3) Locate columns ---
 df=df[0:2200]
+#df=df.sorted()
 print(f"Loaded {len(df)} rows from {path_file}")
 r0_col  = pick(df.columns, "r0", "r_0")
 smf_col = pick(df.columns, "smf", "single_mode_power", "single-mode", "single mode")
@@ -33,11 +36,6 @@ df[r0_col]  = pd.to_numeric(df[r0_col], errors="coerce")
 df[smf_col] = pd.to_numeric(df[smf_col], errors="coerce")
 df[wl_col]  = pd.to_numeric(df[wl_col], errors="coerce")
 df = df.dropna(subset=[r0_col, smf_col, wl_col])
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import pandas as pd
-import matplotlib.pyplot as plt
 
 # 1) Group by settings and compute stats of the measured value (SMF)
 group_cols = [wl_col, r0_col]          # settings that define a case
