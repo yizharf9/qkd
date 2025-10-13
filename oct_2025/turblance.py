@@ -33,11 +33,22 @@ except NameError:
 try:
     wavelength
 except NameError:
-    wavelength = 1234-6  # 1 micronx
+    wavelength = 1.234e-6  # 1 micronx
 try:
     r0_ref
-/except NameError:
+except NameError:
     r0_ref = 0.2 
+try:
+    save_images
+except NameError:
+    save_images_prompt = input("save images (y/n) ?  ") #! <=== change to save photos in single turblance.py run 
+    if save_images_prompt == "y" :
+        save_images = True
+    elif save_images_prompt == "n" :
+        save_images = False
+    else : 
+        exit("not a valid input!")
+
 num_pupil_pixels = 256
 telescope_diameter = 8.0  # example for an 8-meter telescope like VLT
 
@@ -46,8 +57,8 @@ telescope_diameter = 8.0  # example for an 8-meter telescope like VLT
 
 lambda_ref = 0.5e-6        # Fried parameter (m)
 r0 = r0_ref * (wavelength / lambda_ref) ** (6.0 / 5.0)
-L0 = 25.0
-          # outer scale (m)
+L0 = 25.0 # outer scale (m)
+
 Cn2_layer = Cn_squared_from_fried_parameter(r0, wavelength) if 'Cn_squared_from_fried_parameter' in globals() else None
 velocity = (10.0, 0.0)  # m/s horizontal wind
 
@@ -97,7 +108,8 @@ wf0 = Wavefront(initial_aperture, wavelength)
 wf0.total_power = 1.0
 
 print('Initial wavefront and pupil ready.')
-save_field(initial_aperture, 'Pupil (VLT)', 'pupil_vlt')
+if save_images : 
+    save_field(initial_aperture, 'Pupil (VLT)', 'pupil_vlt')
 
 # ----------------------------- Layer 1: Atmospheric turbulence -----------------------------
 print('\n--- Layer 1: Atmospheric turbulence ---')
@@ -116,7 +128,8 @@ phase_screen = atm_layer.phase_for(wavelength)
 wf_turb = Wavefront(initial_aperture * np.exp(1j * phase_screen), wavelength)
 print("wf_turb.total_power: ", wf_turb.total_power)
 print('Generated atmospheric phase screen (radians).')
-save_field(phase_screen, 'Turbulence phase screen (radians)', 'turbulence_phase_screen')
+if save_images : 
+    save_field(phase_screen, 'Turbulence phase screen (radians)', 'turbulence_phase_screen')
 
 # ----------------------------- Layer 2: aperture with 4 spider legs -----------------------------
 print('\n--- Layer 2: Circular aperture + 4 spider legs (VLT-like) ---')
@@ -153,25 +166,27 @@ multi_mode_power = wf_mmf.total_power
 print(f'Multi-mode fiber throughput: {wf_mmf.total_power:.6f}')
 print(f'Single-mode fiber throughput: {wf_smf.total_power:.6f}')
 
-plt.figure(figsize=(12, 5))
-plt.subplot(1, 3, 1)
-imshow_field(wf_foc.power)
-plt.title(f'Focused intensity (to fiber) (λ={wavelength*1e6:.2f}µm)')
+if save_images : 
+    plt.figure(figsize=(12, 5))
+    plt.subplot(1, 3, 1)
+    imshow_field(wf_foc.power)
+    plt.title(f'Focused intensity (to fiber) (λ={wavelength*1e6:.2f}µm)')
 
-plt.subplot(1, 3, 2)
-imshow_field(wf_mmf.power)
-plt.title(f'Multi-mode fiber output power (λ={wavelength*1e6:.2f}µm)')
+    plt.subplot(1, 3, 2)
+    imshow_field(wf_mmf.power)
+    plt.title(f'Multi-mode fiber output power (λ={wavelength*1e6:.2f}µm)')
 
-plt.subplot(1, 3, 3)
-imshow_field(wf_smf.power)
-plt.title(f'Single-mode fiber output power (λ={wavelength*1e6:.2f}µm)')
-plt.tight_layout()
+    plt.subplot(1, 3, 3)
+    imshow_field(wf_smf.power)
+    plt.title(f'Single-mode fiber output power (λ={wavelength*1e6:.2f}µm)')
+    plt.tight_layout()
 
-fiber_output_path = os.path.join(output_dir, f"fiber_outputs_lambda_{wavelength*1e6:.2f}um.png")
-plt.savefig(fiber_output_path, dpi=300)
-plt.close()
-
-print('\nSimulation complete. All images saved to the simulation_output folder.')
+    fiber_output_path = os.path.join(output_dir, f"fiber_outputs_lambda_{wavelength*1e6:.2f}um.png")
+    plt.savefig(fiber_output_path, dpi=300)
+    plt.close()
+    print('\nSimulation complete. All images saved to the simulation_output folder.')
+else :  
+    print('\nSimulation complete. No images saved.')
 
 
 
