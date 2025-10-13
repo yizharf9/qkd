@@ -31,16 +31,19 @@ except NameError:
 try:
     wavelength
 except NameError:
-    wavelength = 1234e-7  # 1 micronx
+    wavelength = 1.55e-6  # 1 micronx
 num_pupil_pixels = 256
 telescope_diameter = 8.0  # example for an 8-meter telescope like VLT
 
 # Turbulence parameters (layer 1)
 try:
-    r0
+    r0_ref
 except NameError:
-    r0 = 0.15          # Fried parameter (m)
-L0 = 25.0          # outer scale (m)
+    r0_ref = 0.2 
+lambda_ref = 0.5e-6        # Fried parameter (m)
+r0 = r0_ref * (wavelength / lambda_ref) ** (6.0 / 5.0)
+L0 = 25.0
+          # outer scale (m)
 Cn2_layer = Cn_squared_from_fried_parameter(r0, wavelength) if 'Cn_squared_from_fried_parameter' in globals() else None
 velocity = (10.0, 0.0)  # m/s horizontal wind
 
@@ -50,9 +53,13 @@ spider_width = 0.05  # fraction of pupil diameter
 
 # Fiber parameters (layer 3)
 multimode_fiber_core_radius = 25e-6  # 25 micron
-singlemode_fiber_core_radius = 9e-6  # 2 micron
 fiber_NA = 0.13
 fiber_length = 10.0
+
+# Keep single-mode fiber truly single-mode across wavelengths by fixing V-number
+# V = 2*pi*a*NA/lambda. Choose V_target < 2.405 (cutoff); use 2.0 for margin.
+V_target = 2.0
+singlemode_fiber_core_radius = (V_target * wavelength) / (2 * np.pi * fiber_NA)
 
 # Output folder
 output_dir = 'simulation_output_'+f"wavelength_{wavelength*1e6:.2f}um_"+f"r0_{r0*1e3:.1f}mm_"+f"run_{run_number}"
@@ -103,8 +110,7 @@ atm_layer.evolve_until(0.0)
 phase_screen = atm_layer.phase_for(wavelength)
 
 wf_turb = Wavefront(initial_aperture * np.exp(1j * phase_screen), wavelength)
-wf_turb.total_power = 1.0
-
+print("wf_turb.total_power: ", wf_turb.total_power)
 print('Generated atmospheric phase screen (radians).')
 save_field(phase_screen, 'Turbulence phase screen (radians)', 'turbulence_phase_screen')
 
@@ -113,8 +119,7 @@ print('\n--- Layer 2: Circular aperture + 4 spider legs (VLT-like) ---')
 aperture_with_spiders = vlt_aperture_function(pupil_grid)
 
 wf_apertured = Wavefront(aperture_with_spiders * np.exp(1j * phase_screen), wavelength)
-wf_apertured.total_power = 1.0
-
+print("wf_apertured.total_power: ", wf_apertured.total_power)
 print('Aperture with spiders created and applied to wavefront.')
 # save_field(aperture_with_spiders, 'VLT-like Aperture (amplitude mask)', 'vlt_aperture_mask')
 
@@ -124,20 +129,22 @@ num_focal_pixels = 256
 D_focus = 2.1 * multimode_fiber_core_radius
 focal_grid = make_pupil_grid(num_focal_pixels, D_focus)
 
-focal_length = telescope_diameter / (2 * fiber_NA)
+# Normalize focal length vs wavelength so the fiber-plane PSF size stays comparable
+lambda_ref = 1.55e-6
+focal_length = (telescope_diameter / (2 * fiber_NA)) * (lambda_ref / wavelength)
 propagator = FraunhoferPropagator(pupil_grid, focal_grid, focal_length=focal_length)
 
 wf_foc = propagator(Wavefront(aperture_with_spiders * np.exp(1j * phase_screen), wavelength))
-wf_foc.total_power = 1.0
-
+#wf_foc.total_power = 1.0
+print("wf_foc.total_power: ", wf_foc.total_power)
 multi_mode_fiber = StepIndexFiber(multimode_fiber_core_radius, fiber_NA, fiber_length)
 single_mode_fiber = StepIndexFiber(singlemode_fiber_core_radius, fiber_NA, fiber_length)
 
 wf_mmf = multi_mode_fiber.forward(wf_foc)
 wf_smf = single_mode_fiber.forward(wf_foc)
 
-single_mode_power = wf_mmf.total_power
-multi_mode_power = wf_smf.total_power
+single_mode_power = wf_smf.total_power
+multi_mode_power = wf_mmf.total_power
 
 print(f'Multi-mode fiber throughput: {wf_mmf.total_power:.6f}')
 print(f'Single-mode fiber throughput: {wf_smf.total_power:.6f}')
