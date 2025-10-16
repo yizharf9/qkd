@@ -28,7 +28,7 @@ start = 0.01
 end = 0.15
 r0_list = np.linspace(start=start,stop=end,num=num_of_r0_samples,)
 
-N = 20
+N = 100
 
 for wavelength in [1.55e-6, 0.500e-6] :
     for r0_ref in r0_list :

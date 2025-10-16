@@ -21,15 +21,15 @@ print("-" * 60) # Visual separator
 try:
     run_number
 except NameError:
-    run_number= 0
+    run_number= 26
 try:
     wavelength
 except NameError:
-    wavelength = 1.234e-6
+    wavelength = 1.55e-6
 try:
     r0_ref
 except NameError:
-    r0_ref = 0.2
+    r0_ref = 0.1
 try:
     save_images
 except NameError:
@@ -126,38 +126,51 @@ print(f"Fractional power: {frac1:.6%}")
 if save_images:
     import matplotlib.patches as mpatches
     from mpl_toolkits.axes_grid1 import make_axes_locatable
-    fig, axes = plt.subplots(1, 2, figsize=(9, 4), dpi=150)
-    img_kwargs = dict(cmap='inferno', vmin=-6, vmax=0)
+#yassume: psf is an HCIPy Field on a focal grid with angular coords (rad)
+fg = psf0.grid                        # same grid for psf1
+f_m = f_eff          # <-- set this to your f
 
-    for ax, psf, title in zip(
-        axes,
-        [psf0, psf1],
-        ["Unaberrated PSF (before)", "Turbulent PSF (after)"]
-    ):
-        im = imshow_field(np.log10(psf/psf.max()), ax=ax, **img_kwargs)
+# compute image extents in meters using the grid limits (in rad) times f
+xmin_m, xmax_m = fg.x.min()*f_m, fg.x.max()*f_m
+ymin_m, ymax_m = fg.y.min()*f_m, fg.y.max()*f_m
 
-        # circle overlay in angular units (rad)
-        circ = mpatches.Circle((0.0, 0.0), alpha, fill=False, linewidth=1.5)
-        ax.add_patch(circ)
+# plot using plain matplotlib imshow with 'extent' in meters
+fig, axes = plt.subplots(1,2, figsize=(9,4), dpi=150)
+fig, axes = plt.subplots(1, 2, figsize=(9, 4), dpi=150)
 
-        # labels & title
-        ax.set_title(title)
-        ax.set_xlabel(r'$\theta_x$ [rad]')
-        ax.set_ylabel(r'$\theta_y$ [rad]')
+for ax, psf, title in zip(
+    axes, [psf0, psf1],
+    ["Unaberrated PSF (before)", "Turbulent PSF (after)"]
+):
+    psf_img = np.log10((psf / psf.max()).shaped + 1e-12)  # key fix
+    im = ax.imshow(psf_img,
+                   origin='lower',
+                   extent=[xmin_m, xmax_m, ymin_m, ymax_m],
+                   cmap='inferno', vmin=-6, vmax=0)
 
-        # add a dedicated, aligned colorbar to the right of this axis
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.06)
-        cb = fig.colorbar(im, cax=cax)
-        cb.set_label(r'$\log_{10}(\mathrm{Intensity}/\max)$ [dimensionless]')
+    circ = mpatches.Circle((0.0, 0.0), radius=alpha*f_m, fill=False, linewidth=1.5)
+    ax.add_patch(circ)
+    ax.set_title(title)
+    ax.set_xlabel('x [m]')
+    ax.set_ylabel('y [m]')
 
-    plt.tight_layout()
-    base_output_dir = 'simulation_output'
-    # Using r0_ref in the folder name for consistency with logged data
-    image_path = f"wavelength_{wavelength*1e6:.2f}um_r0_ref_{r0_ref*1e3:.1f}mm_run_{run_number}.png"
-    output_path = os.path.join(base_output_dir,image_path)
-    plt.savefig(output_path, dpi=300)
-    plt.close()
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.06)
+    cb = fig.colorbar(im, cax=cax)
+    cb.set_label(r'$\log_{10}(\mathrm{Intensity}/\max)$')
+
+# run these ONCE after the loop
+plt.tight_layout()
+
+base_output_dir = 'simulation_output'
+os.makedirs(base_output_dir, exist_ok=True)
+output_path = os.path.join(
+    base_output_dir,
+    f"wavelength_{wavelength*1e6:.2f}um_r0_ref_{r0_ref*1e3:.1f}mm_run_{run_number}.png"
+)
+plt.savefig(output_path, dpi=300)
+plt.close()
+
 
 def update_csv( wavelength,
                 r0_ref_val,
