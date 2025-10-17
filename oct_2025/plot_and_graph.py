@@ -1,15 +1,29 @@
-path_file="/Users/idoshlomy/PycharmProjects/qkd/massive_output.csv"
+path_file="/Users/idoshlomy/Documents/qkd/oct_2025/massive_output.csv"
+#wavelength,r0_ref,run_number,power_in_bucket_before_turbulance,total_power_before_turbulance,precentage_before_turbulance,power_in_bucket_after_turbulance,total_power_after_turbulance,precentage_after_turbulance,time
+# run this to plot the massive_output.csv file
 import pandas as pd
 import matplotlib.pyplot as plt
 import time
+import os
+#--- 0) Ensure correct working directory ---
+print("Checking current working directory...")
+current_directory_name = os.path.basename(os.getcwd())
+if current_directory_name == 'oct_2025':
+    print(f"✅ Success: Script is running from the correct directory ('{current_directory_name}').")
+else:
+    print(f"⚠️ Warning: Script is NOT running from the 'oct_2025' directory.")
+    print(f"   Current directory is: '{current_directory_name}'")
+    exit("Execution stopped. Please run the script from the 'oct_2025' directory.")
+print("-" * 60) # Visual separator
 long_wl = 1.55e-6  # [m]
 # --- 1) Load CSV ---
 df = pd.read_csv(path_file)
 print(f"Loaded {len(df)} rows from {path_file}")
+print("#"*50)
 # --- 2) Normalize column names (robust to spaces/case) ---
 df.columns = df.columns.str.strip().str.lower()
 print(df.columns)
-df=df[df["wavelength"]<6e-7]
+#df=df[df["wavelength"]<6e-7]
 print(f"Loaded {len(df)} rows from {path_file}")
 def pick(colnames, *candidates):
     for c in candidates:
@@ -21,14 +35,23 @@ def pick(colnames, *candidates):
     return None
 
 # --- 3) Locate columns ---
-df=df[0:2200]
+#df=df[0:2200]
 #df=df.sorted()
-print(f"Loaded {len(df)} rows from {path_file}")
-r0_col  = pick(df.columns, "r0", "r_0")
-smf_col = pick(df.columns, "smf", "single_mode_power", "single-mode", "single mode")
-wl_col  = pick(df.columns, "wavelength", "lambda", "lam", "wl")
+after =True # for after , for before set to False
 
-if not (r0_col and smf_col and wl_col):
+
+print(f"Loaded {len(df)} rows from {path_file}")
+r0_col  = pick(df.columns, "r0", "r_0", "r0_ref", "r_0_ref")
+smf_col_after = pick(df.columns,"power_in_bucket_after_turbulance")
+smf_col_before = pick(df.columns,"power_in_bucket_before_turbulance")
+wl_col  = pick(df.columns, "wavelength", "lambda", "lam", "wl")
+print("#"*50)
+print(f"Loaded {len(r0_col)} rows from {path_file}")
+if after:
+    smf_col = smf_col_after
+else:
+    smf_col = smf_col_before
+if not (r0_col and smf_col and wl_col ):
     raise ValueError(f"Need columns for r0, smf, wavelength. Found: {list(df.columns)}")
 
 # --- 4) Clean types ---
@@ -64,7 +87,7 @@ plt.title(f"{val_col} vs {r0_col} — mean with min–max band per wavelength")
 plt.grid(True, alpha=0.3)
 plt.legend()
 plt.tight_layout()
-plt.show()
+#plt.show()
 time.sleep(1)  # ensure the plot is rendered before printing below
 plt.close()
 
@@ -78,3 +101,58 @@ print(stats.tail(12).to_string(index=False))
 
 print("data for display:")
 print(df.tail())
+# 2) Plot A: mean curve with min–max envelope (optional figure)
+fig_stats, ax_stats = plt.subplots(figsize=(8, 5))
+for wl, d in stats.groupby(wl_col, sort=True):
+    d = d.sort_values(r0_col)
+    ax_stats.plot(d[r0_col], d['mean'], label=f"λ = {wl:g} (mean)")
+    ax_stats.fill_between(d[r0_col], d['min'], d['max'], alpha=0.2, linewidth=0)
+ax_stats.set(
+    xlabel=r0_col,
+    ylabel=val_col,
+    title=f"{val_col} vs {r0_col} — mean with min–max band per wavelength"
+)
+ax_stats.grid(True, alpha=0.3)
+ax_stats.legend()
+fig_stats.tight_layout()
+plt.close(fig_stats)  # we’re not saving this one
+
+# 3) Plot B: dot-per-row + mean line per wavelength (this is the one we save)
+import itertools
+fig_scatter, ax = plt.subplots(figsize=(9, 6))
+
+# consistent colors per wavelength
+color_cycle = itertools.cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
+unique_wls = sorted(df[wl_col].unique())
+wl_color = {wl: next(color_cycle) for wl in unique_wls}
+
+# dots
+for wl, d in df.groupby(wl_col, sort=True):
+    ax.scatter(d[r0_col], d[val_col], s=14, alpha=0.55, linewidths=0,
+               color=wl_color[wl], label=f"λ = {wl:g} dots")
+
+# mean lines
+for wl, d in stats.groupby(wl_col, sort=True):
+    d = d.sort_values(r0_col)
+    ax.plot(d[r0_col], d['mean'], color=wl_color[wl], linewidth=2.2,
+            label=f"λ = {wl:g} mean")
+
+ax.set(
+    xlabel=r0_col,
+    ylabel=val_col,
+    title=f"{val_col} vs {r0_col} — dots (rows) + mean line per wavelength"
+)
+ax.grid(True, alpha=0.3)
+ax.legend(ncol=2, frameon=True)
+fig_scatter.tight_layout()
+
+# ---- SAVE THE CORRECT FIGURE (the dots+mean one) ----
+os.makedirs("plots", exist_ok=True)
+fname = f"{val_col}_vs_{r0_col}_{'after' if after else 'before'}_{int(time.time())}.png"
+save_path = os.path.join("plots", fname)
+fig_scatter.savefig(save_path, dpi=300, bbox_inches="tight")  # <-- save THIS figure
+print(f"✅ Saved plot to: {save_path}")
+
+# (optional) show after saving
+plt.show()
+plt.close(fig_scatter)
