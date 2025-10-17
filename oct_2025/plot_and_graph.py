@@ -154,5 +154,73 @@ fig_scatter.savefig(save_path, dpi=300, bbox_inches="tight")  # <-- save THIS fi
 print(f"✅ Saved plot to: {save_path}")
 
 # (optional) show after saving
+#plt.show()
+plt.close(fig_scatter)
+
+import itertools
+import numpy as np
+from matplotlib.ticker import LogLocator, NullFormatter, ScalarFormatter
+
+# 3) Plot B: dot-per-row + mean line per wavelength (log-log)
+fig_scatter, ax = plt.subplots(figsize=(9, 6))
+
+# -------- filter to positive domain for log scale --------
+pos_df = df[(df[r0_col] > 0) & (df[val_col] > 0)].copy()
+pos_stats = stats[
+    (stats[r0_col] > 0) &
+    (stats['mean'] > 0) &
+    (stats['min']  > 0) &
+    (stats['max']  > 0)
+].copy()
+
+# consistent colors per wavelength
+color_cycle = itertools.cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
+unique_wls = sorted(pos_df[wl_col].unique())
+wl_color = {wl: next(color_cycle) for wl in unique_wls}
+
+# dots (each row)
+for wl, d in pos_df.groupby(wl_col, sort=True):
+    ax.scatter(d[r0_col], d[val_col],
+               s=14, alpha=0.55, linewidths=0,
+               color=wl_color[wl], label=f"λ = {wl:g} dots")
+
+# mean lines
+for wl, d in pos_stats.groupby(wl_col, sort=True):
+    d = d.sort_values(r0_col)
+    ax.plot(d[r0_col], d['mean'],
+            color=wl_color[wl], linewidth=2.2,
+            label=f"λ = {wl:g} mean")
+
+# ---- log scales + tidy ticks ----
+ax.set_xscale('log')
+ax.set_yscale('log')
+
+# Major & minor locators (auto is fine; this cleans up clutter)
+ax.xaxis.set_major_locator(LogLocator(base=10.0))
+ax.yaxis.set_major_locator(LogLocator(base=10.0))
+ax.xaxis.set_minor_locator(LogLocator(base=10.0, subs=np.arange(2, 10)*0.1))
+ax.yaxis.set_minor_locator(LogLocator(base=10.0, subs=np.arange(2, 10)*0.1))
+ax.xaxis.set_minor_formatter(NullFormatter())
+ax.yaxis.set_minor_formatter(NullFormatter())
+
+# Labels / title
+ax.set_xlabel(r0_col + " (log scale)")
+ax.set_ylabel(val_col + " (log scale)")
+ax.set_title(f"{val_col} vs {r0_col} — dots + mean (log–log)")
+
+# Grid on both major & minor
+ax.grid(True, which='both', alpha=0.3)
+
+# Legend & layout
+ax.legend(ncol=2, frameon=True)
+fig_scatter.tight_layout()
+
+# ---- SAVE ----
+os.makedirs("plots", exist_ok=True)
+fname = f"{val_col}_vs_{r0_col}_{'after' if after else 'before'}_loglog_{int(time.time())}.png"
+save_path = os.path.join("plots", fname)
+fig_scatter.savefig(save_path, dpi=300, bbox_inches="tight")
+print(f"✅ Saved plot to: {save_path}")
+
 plt.show()
 plt.close(fig_scatter)
