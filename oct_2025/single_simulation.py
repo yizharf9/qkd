@@ -21,6 +21,10 @@ else:
 print("-" * 60) # Visual separator
 # ----------------------------- Parameters -----------------------------
 try:
+    TurbulencLayer
+except NameError:
+    TurbulencLayer = True
+try:
     run_number
 except NameError:
     run_number= 26
@@ -84,7 +88,10 @@ try:
     layer = InfiniteAtmosphericLayer(pupil_grid, Cn2, L0, v)
 except TypeError:
     layer = InfiniteAtmosphericLayer(Cn2, L0, v)
-wf1 = layer(wf0)                 # wavefront AFTER turbulence
+if TurbulencLayer is True:
+    wf1 = layer(wf0)      
+else:
+    wf1=wf0           # wavefront AFTER turbulence
 psf1 = prop(wf1).power           # instantaneous PSF with turbulence
 # ---- 4a) Visualize the turbulence phase screen (on the pupil grid) ----
 """"

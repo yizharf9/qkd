@@ -4,7 +4,7 @@ import numpy as np
 import time
 import datetime as dt
 print("\n")
-print("Starting massive simulation runs...")
+print("Starting massive simution runs...")
 print("Current working directory:", os.getcwd())
 print("Script start time:", dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S") )
 
@@ -40,7 +40,8 @@ for wavelength in [1.55e-6, 0.500e-6] :
                     "wavelength": wavelength,
                     "r0_ref": r0_ref,  # example value for r0_ref
                     "save_images": save_images,  # example value for r0_ref
-                }
+                    "TurbulencLayer": False,
+               }
 
             print(f"\n=== run_number={run_number} ===")
             exec(code_obj, ns,ns)  # fresh globals per run (no locals dict)
