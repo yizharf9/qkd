@@ -82,9 +82,26 @@ try:
     layer = InfiniteAtmosphericLayer(pupil_grid, Cn2, L0, v)
 except TypeError:
     layer = InfiniteAtmosphericLayer(Cn2, L0, v)
-
 wf1 = layer(wf0)                 # wavefront AFTER turbulence
 psf1 = prop(wf1).power           # instantaneous PSF with turbulence
+# ---- 4a) Visualize the turbulence phase screen (on the pupil grid) ----
+base_output_dir = 'turbulence_phase_images'
+fig = plt.figure(figsize=(5, 4), dpi=150)
+imshow_field(layer.phase_for(wavelength), cmap='RdBu', vmin=-np.pi, vmax=np.pi)
+plt.title("Turbulence phase screen [rad]")
+plt.xlabel('x [m]')
+plt.ylabel('y [m]')
+
+if 'save_images' in globals() and save_images:
+    os.makedirs(base_output_dir, exist_ok=True)
+    phase_path = os.path.join(
+        base_output_dir,
+        f"phase_{wavelength*1e6:.2f}um_r0ref_{r0_ref*1e3:.1f}mm_run_{run_number}.png"
+    )
+    plt.savefig(phase_path, dpi=300)
+    plt.close()
+else:
+    plt.show()
 
 # ---------- 5) Bucket definition: 9 µm circle in focal plane ----------
 Fnum_sci = 50.0                 # adjust to your optics if needed #! understand what this mean...
