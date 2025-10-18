@@ -95,3 +95,60 @@ def plot_psf_on(fig,ax, psf,alpha,f_m,extent_focal_mm,scale_mm, title):
     cax = div.append_axes("right", size="5%", pad=0.06)
     cb = fig.colorbar(im, cax=cax)
     cb.set_label(r'$\log_{10}(\mathrm{Intensity}/\max)$')
+
+from matplotlib import animation
+from IPython.display import HTML
+import matplotlib.pyplot as plt
+
+def animate_wavefronts(images_folder_dir,image_titles=None, interval=50, repeat_delay=1000):
+    """Creates an animation from a list of Matplotlib image artists.
+    This function is designed to be used in a Jupyter/IPython notebook
+    environment to display the animation inline.
+
+    Args:
+        images: A list of Matplotlib image artists (e.g., the objects
+                returned by `hci.imshow_field` or `plt.imshow`).
+        interval: Delay between frames in milliseconds.
+        repeat_delay: Delay in milliseconds before repeating the animation.
+
+    Returns:
+        An IPython.display.HTML object for displaying the animation.
+    """
+        
+    if not images_folder_dir:
+        print("Warning: The image list is empty. No animation will be created.")
+        return None
+    
+    images_dirs = []
+    for image_dir in os.listdir(images_folder_dir):
+        if image_dir.endswith(".png"):
+            images_dirs.append(image_dir)
+    images_dirs.sort()
+    
+    if image_titles is None:
+        image_titles = [i for i in range(len(images_dirs))]
+    
+    images = [plt.imshow(plt.imread(os.path.join(images_folder_dir,images_dir))) for images_dir in images_dirs]
+    plt.close()
+    
+    # Get the figure from the first image artist in the list
+    fig = images[0].figure
+
+    # ArtistAnimation requires a list of lists, where each inner list is a frame.
+    # We'll wrap each of our images in its own list to create the frames.
+    artist_list = [[img] for img in images]
+
+    # Create the animation
+    anim = animation.ArtistAnimation(
+                                        fig, 
+                                        artist_list,
+                                        interval=interval,
+                                        repeat_delay=repeat_delay,
+                                        blit=True
+                                    )
+
+    # Close the static figure to prevent it from displaying
+    plt.close(fig)
+
+    # Return the animation as an HTML5 video
+    return HTML(anim.to_jshtml())

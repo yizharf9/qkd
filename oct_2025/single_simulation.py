@@ -152,7 +152,7 @@ if save_images:
     utils.plot_psf_on(fig,axes[1], psf0,alpha,f_m,extent_focal_mm,scale_mm, "Unaberrated PSF (before)")
 
     # --- (c) Turbulent PSF ---
-    utils.plot_psf_on(fig,axes[2], psf0,alpha,f_m,extent_focal_mm,scale_mm, "Turbulent PSF (after)")
+    utils.plot_psf_on(fig,axes[2], psf1,alpha,f_m,extent_focal_mm,scale_mm, "Turbulent PSF (after)")
 
     plt.tight_layout()
 

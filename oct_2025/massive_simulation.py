@@ -40,8 +40,8 @@ r0_list = np.linspace(start=start,stop=end,num=num_of_r0_samples,)
 wavelengths = [1.55e-6, 0.500e-6]
 
 # num of runs for values specified values
-N = 10
-
+N = 4
+count = 1
 for wavelength in wavelengths :
     for r0_ref in r0_list :
         for run_number in range(1,N+1):  # example run number
@@ -54,5 +54,7 @@ for wavelength in wavelengths :
                     "save_images": save_images,  # example value for r0_ref
                     "TurbulencLayer": TurbulencLayer,
                 }
-            print(f"\n=== run_number={run_number} finished out of {len(r0_list) * len(wavelengths) * N  } ({run_number/(len(r0_list) * len(wavelengths) * N  ) * 100:.3f}%) ===")
+            print(f"\n=== run_number={count - 1} finished out of {len(r0_list) * len(wavelengths) * N  } ({count/(len(r0_list) * len(wavelengths) * N  ) * 100:.3f}%) ===")
             exec(code_obj, ns,ns)  # fresh globals per run (no locals dict)
+            count += 1
+
