@@ -1,24 +1,14 @@
 import os
+import utils
 import numpy as np
 import matplotlib.pyplot as plt
-import datetime
 try:
     from hcipy import *
 except Exception as e:
     raise ImportError("HCIPy is required. Install it with: pip install hcipy") from e
-import matplotlib.patches as mpatches
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 # ----------------------------- Directory Check -----------------------------
-print("Checking current working directory...")
-current_directory_name = os.path.basename(os.getcwd())
-if current_directory_name == 'oct_2025':
-    print(f"✅ Success: Script is running from the correct directory ('{current_directory_name}').")
-else:
-    print(f"⚠️ Warning: Script is NOT running from the 'oct_2025' directory.")
-    print(f"   Current directory is: '{current_directory_name}'")
-    exit("Execution stopped. Please run the script from the 'oct_2025' directory.")
-print("-" * 60) # Visual separator
+utils.check_dir()
 # ----------------------------- Parameters -----------------------------
 try:
     TurbulencLayer
@@ -65,6 +55,7 @@ q = 4
 num_airy = 30
 spatial_res = wavelength / D  # [rad] per λ/D
 focal_grid = make_focal_grid(q=q, num_airy=num_airy, spatial_resolution=spatial_res)
+
 prop = FraunhoferPropagator(pupil_grid, focal_grid) # transforms from pupil_grid to focal_grid
 
 # ---------- 3) Wavefront (before turbulence) ----------
@@ -88,37 +79,20 @@ try:
     layer = InfiniteAtmosphericLayer(pupil_grid, Cn2, L0, v)
 except TypeError:
     layer = InfiniteAtmosphericLayer(Cn2, L0, v)
+
 if TurbulencLayer is True:
     wf1 = layer(wf0)      
 else:
     wf1=wf0           # wavefront AFTER turbulence
 psf1 = prop(wf1).power           # instantaneous PSF with turbulence
-# ---- 4a) Visualize the turbulence phase screen (on the pupil grid) ----
-""""
-base_output_dir = 'turbulence_phase_images'
-fig = plt.figure(figsize=(5, 4), dpi=150)
-imshow_field(layer.phase_for(wavelength), cmap='RdBu', vmin=-np.pi, vmax=np.pi)
-plt.title("Turbulence phase screen [rad]")
-plt.xlabel('x [m]')
-plt.ylabel('y [m]')
 
-if 'save_images' in globals() and save_images:
-    os.makedirs(base_output_dir, exist_ok=True)
-    phase_path = os.path.join(
-        base_output_dir,
-        f"phase_{wavelength*1e6:.2f}um_r0ref_{r0_ref*1e3:.1f}mm_run_{run_number}.png"
-    )
-    plt.savefig(phase_path, dpi=300)
-    plt.close()
-else:
-    plt.show()
-"""
 # ---------- 5) Bucket definition: 9 µm circle in focal plane ----------
 Fnum_sci = 50.0                 # adjust to your optics if needed #! understand what this mean...
 f_eff = Fnum_sci * D            # [m] effective focal length
 diam_phys = 9e-6                # [m]
 rad_phys  = diam_phys / 2.0     # [m]
 alpha = rad_phys / f_eff        # [rad] angular radius on focal plane
+
 
 theta = np.sqrt(focal_grid.x**2 + focal_grid.y**2)  # [rad] #! how this happens?
 bucket_mask = (theta <= alpha).astype(float)
@@ -136,6 +110,8 @@ power1_total     = np.sum(psf1 * w)
 frac1 = power1_in_bucket / power1_total
 
 # ---------- 7) Print results ----------
+#region : prints
+print(f"wavelength = {wavelength} , r0 = {r0_ref} , ")
 print("=== Bucket (9 µm diameter) @ focal plane ===")
 print(f"F/# = {Fnum_sci:.1f},  f_eff = {f_eff:.3f} m")
 print(f"Circle radius (phys): {rad_phys:.3e} m")
@@ -148,187 +124,47 @@ print("\n-- AFTER turbulence (instantaneous) --")
 print(f"Power in bucket:  {power1_in_bucket:.6e} (relative)")
 print(f"Total power:      {power1_total:.6e} (relative)")
 print(f"Fractional power: {frac1:.6%}")
-
+#endregion
 # ---------- 8) Optional: overlay circle on both PSFs ----------
-phase_screen = layer.phase_for(wavelength)          # Field on the pupil grid (radians)
-
-# pupil-plane extent (meters -> mm for readability)
-scale_mm = 1e3
-xmin_p, xmax_p = pupil_grid.x.min()*scale_mm, pupil_grid.x.max()*scale_mm
-ymin_p, ymax_p = pupil_grid.y.min()*scale_mm, pupil_grid.y.max()*scale_mm
-extent_pupil_mm = [xmin_p, xmax_p, ymin_p, ymax_p]
-
-# focal-plane extent (מחשבים מהמוקד)
-f_m = f_eff
-xmin_m = psf0.grid.x.min()*f_m; xmax_m = psf0.grid.x.max()*f_m
-ymin_m = psf0.grid.y.min()*f_m; ymax_m = psf0.grid.y.max()*f_m
-extent_focal_mm = [xmin_m*scale_mm, xmax_m*scale_mm, ymin_m*scale_mm, ymax_m*scale_mm]
-
-# 1) Figure & axes
-fig, axes = plt.subplots(1, 3, figsize=(14, 4.5), dpi=150)
-
-# --- (a) Phase screen (pupil plane) ---
-ax = axes[0]
-im_phase = ax.imshow(phase_screen.shaped, origin='lower', cmap='RdBu',
-                     vmin=-np.pi, vmax=np.pi, extent=extent_pupil_mm)
-ax.set_title("Turbulence phase screen [rad]")
-ax.set_xlabel('x [mm]'); ax.set_ylabel('y [mm]')
-ax.set_aspect('equal', adjustable='box')
-div = make_axes_locatable(ax); cax = div.append_axes("right", size="5%", pad=0.06)
-cb = fig.colorbar(im_phase, cax=cax); cb.set_label('Phase [rad]')
-
-# helper לציור PSF
-def plot_psf_on(ax, psf, title):
-    psf_img = np.log10((psf / psf.max()).shaped + 1e-12)
-    im = ax.imshow(psf_img, origin='lower', extent=extent_focal_mm,
-                   cmap='inferno', vmin=-6, vmax=0)
-    circ = mpatches.Circle((0.0, 0.0), radius=alpha*f_m*scale_mm,
-                           fill=False, linewidth=1.5)
-    ax.add_patch(circ)
-    ax.set_title(title)
-    ax.set_xlabel('x [mm]'); ax.set_ylabel('y [mm]')
-    ax.set_aspect('equal', adjustable='box')
-    div = make_axes_locatable(ax); cax = div.append_axes("right", size="5%", pad=0.06)
-    cb = fig.colorbar(im, cax=cax)
-    cb.set_label(r'$\log_{10}(\mathrm{Intensity}/\max)$')
-
-# --- (b) Unaberrated PSF ---
-plot_psf_on(axes[1], psf0, "Unaberrated PSF (before)")
-
-# --- (c) Turbulent PSF ---
-plot_psf_on(axes[2], psf1, "Turbulent PSF (after)")
-
-plt.tight_layout()
-
-# save or show (תמיד נשמור לאותה תיקייה כמו קודם)
-base_output_dir = 'simulation_output'
-os.makedirs(base_output_dir, exist_ok=True)
-out_path = os.path.join(
-    base_output_dir,
-    f"phase_psf_wl_{wavelength*1e6:.2f}um_r0ref_{r0_ref*1e3:.1f}mm_run_{run_number}.png"
-)
-plt.savefig(out_path, dpi=300, bbox_inches="tight")
-print(f"✅ Saved combined figure to: {out_path}")
-plt.close(fig)
-
-
-
-"""
-
-# ---------- 8) One figure with: [phase | PSF before | PSF after] ----------
-import matplotlib.patches as mpatches
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-
-# 0) Data & extents
-
-
-
-
-
-"""
-
-
-
 if save_images:
-    import matplotlib.patches as mpatches
-    from mpl_toolkits.axes_grid1 import make_axes_locatable
-#yassume: psf is an HCIPy Field on a focal grid with angular coords (rad)
-fg = psf0.grid                        # same grid for psf1
-f_m = f_eff          # <-- set this to your f
-# compute image extents in meters using the grid limits (in rad) times f
-scale = 1e3   # m -> mm
-xmin_m, xmax_m = fg.x.min()*f_m, fg.x.max()*f_m
-ymin_m, ymax_m = fg.y.min()*f_m, fg.y.max()*f_m
-extent_mm = [xmin_m*scale, xmax_m*scale, ymin_m*scale, ymax_m*scale]
+    phase_screen = layer.phase_for(wavelength)          # Field on the pupil grid (radians)
 
-# plot using plain matplotlib imshow with 'extent' in meters
-fig, axes = plt.subplots(1,2, figsize=(9,4), dpi=150)
-fig, axes = plt.subplots(1, 2, figsize=(9, 4), dpi=150)
+    # pupil-plane extent (meters -> mm for readability)
+    scale_mm = 1e3
+    xmin_p, xmax_p = pupil_grid.x.min()*scale_mm, pupil_grid.x.max()*scale_mm
+    ymin_p, ymax_p = pupil_grid.y.min()*scale_mm, pupil_grid.y.max()*scale_mm
+    extent_pupil_mm = [xmin_p, xmax_p, ymin_p, ymax_p]
 
-for ax, psf, title in zip(
-    axes, [psf0, psf1],
-    ["Unaberrated PSF (before)", "Turbulent PSF (after)"]
-):
-    """
-    im = ax.imshow(psf_img, origin='lower', extent=extent_mm, cmap='inferno', vmin=-6, vmax=0)
+    # focal-plane extent (מחשבים מהמוקד)
+    f_m = f_eff
+    xmin_m = psf0.grid.x.min()*f_m
+    xmax_m = psf0.grid.x.max()*f_m
+    ymin_m = psf0.grid.y.min()*f_m
+    ymax_m = psf0.grid.y.max()*f_m
+    extent_focal_mm = [xmin_m*scale_mm, xmax_m*scale_mm, ymin_m*scale_mm, ymax_m*scale_mm]
+    # 1) Figure & axes
+    fig, axes = plt.subplots(1, 3, figsize=(14, 4.5), dpi=150)
 
-    """
-    psf_img = np.log10((psf / psf.max()).shaped + 1e-12)  # key fix
-    im = ax.imshow(psf_img,
-                   origin='lower',
-                   extent=extent_mm,
-                   cmap='inferno', vmin=-6, vmax=0)
+    # --- (a) Phase screen (pupil plane) ---
+    utils.plot_phase_screen(fig,axes[0],phase_screen,extent_pupil_mm)
 
-    circ = mpatches.Circle((0.0, 0.0), radius=alpha*f_m*scale, fill=False, linewidth=1.5)
-    ax.add_patch(circ)
-    ax.set_title(title)
-    ax.set_xlabel('x [mm]')
-    ax.set_ylabel('y [mm]')
+    # --- (b) Unaberrated PSF ---
+    utils.plot_psf_on(fig,axes[1], psf0,alpha,f_m,extent_focal_mm,scale_mm, "Unaberrated PSF (before)")
 
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.06)
-    cb = fig.colorbar(im, cax=cax)
-    cb.set_label(r'$\log_{10}(\mathrm{Intensity}/\max)$')
+    # --- (c) Turbulent PSF ---
+    utils.plot_psf_on(fig,axes[2], psf0,alpha,f_m,extent_focal_mm,scale_mm, "Turbulent PSF (after)")
 
-# run these ONCE after the loop
-plt.tight_layout()
+    plt.tight_layout()
 
-base_output_dir = 'simulation_output'
-os.makedirs(base_output_dir, exist_ok=True)
-output_path = os.path.join(
-    base_output_dir,
-    f"wavelength_{wavelength*1e6:.2f}um_r0_ref_{r0_ref*1e3:.1f}mm_run_{run_number}.png"
-)
-plt.savefig(output_path, dpi=300)
-plt.close()
+    # save or show (תמיד נשמור לאותה תיקייה כמו קודם)
+    base_output_dir = 'simulation_output'
+    os.makedirs(base_output_dir, exist_ok=True)
+    out_path = os.path.join(
+        base_output_dir,
+        f"phase_psf_wl_{wavelength*1e6:.2f}um_r0ref_{r0_ref*1e3:.1f}mm_run_{run_number}.png"
+    )
+    plt.savefig(out_path, dpi=300, bbox_inches="tight")
+    print(f"✅ Saved combined figure to: {out_path}")
+    plt.close(fig)
 
-
-def update_csv( wavelength,
-                r0_ref_val,
-                run_num,
-                power_in_bucket_before,
-                total_power_before,
-                precentage_before,
-                power_in_bucket_after,
-                total_power_after,
-                precentage_after
-                ):
-    import pandas as pd
-
-    file_path = "./massive_output.csv"
-    columns = [
-        "wavelength",
-        "r0_ref",
-        "run_number",
-        "power_in_bucket_before_turbulance",
-        "total_power_before_turbulance",
-        "precentage_before_turbulance",
-        "power_in_bucket_after_turbulance",
-        "total_power_after_turbulance",
-        "precentage_after_turbulance",
-        "time"
-        ]
-
-    new_row_df = pd.DataFrame([{
-        "wavelength": wavelength,
-        "r0_ref": r0_ref_val,
-        "run_number": run_num,
-        
-        "power_in_bucket_before_turbulance": power_in_bucket_before,
-        "total_power_before_turbulance": total_power_before,
-        "precentage_before_turbulance": precentage_before,
-        
-        "power_in_bucket_after_turbulance": power_in_bucket_after,
-        "total_power_after_turbulance": total_power_after,
-        "precentage_after_turbulance": precentage_after,
-        
-        "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }])
-
-    if os.path.exists(file_path):
-        new_row_df.to_csv(file_path, mode='a', header=False, index=False)
-    else:
-        new_row_df.to_csv(file_path, mode='w', header=columns, index=False)
-    print("Operation complete. Data has been saved.")
-
-update_csv(wavelength, r0_ref, run_number,power0_in_bucket,power0_total,frac0,power1_in_bucket,power1_total,frac1)
+utils.update_csv(wavelength, r0_ref, run_number,power0_in_bucket,power0_total,frac0,power1_in_bucket,power1_total,frac1)

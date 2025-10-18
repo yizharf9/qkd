@@ -1,7 +1,7 @@
 import os
+import utils
 from pathlib import Path
 import numpy as np
-import time
 import datetime as dt
 print("\n")
 print("Starting massive simution runs...")
@@ -19,18 +19,30 @@ elif save_images_prompt == "n" :
 else : 
     exit("not a valid input!")
 
+TurbulencLayer_prompt = input("add layer with no turbulance (y/n) ?  ") #! <=== change to add layer without turb photos in single turblance.py run 
+if TurbulencLayer_prompt == "y" :
+    TurbulencLayer = True
+elif TurbulencLayer_prompt == "n" :
+    TurbulencLayer = False
+else : 
+    exit("not a valid input!")
+
 code = open(path_file,"r", encoding="utf-8").read()
 code_obj = compile(code, "single_simulation.py", "exec")
 
-# r0_list=[0.01, 0.03, 0.05, 0.07, 0.09, 0.11, 0.13, 0.15, 0.17, 0.19, 0.2] # original values of simulation
+# r0 values
 num_of_r0_samples = 10
 start = 0.01
 end = 0.15
 r0_list = np.linspace(start=start,stop=end,num=num_of_r0_samples,)
 
-N = 100
+# wavelength values
+wavelengths = [1.55e-6, 0.500e-6]
 
-for wavelength in [1.55e-6, 0.500e-6] :
+# num of runs for values specified values
+N = 10
+
+for wavelength in wavelengths :
     for r0_ref in r0_list :
         for run_number in range(1,N+1):  # example run number
             ns = {
@@ -40,8 +52,7 @@ for wavelength in [1.55e-6, 0.500e-6] :
                     "wavelength": wavelength,
                     "r0_ref": r0_ref,  # example value for r0_ref
                     "save_images": save_images,  # example value for r0_ref
-                    "TurbulencLayer": False,
-               }
-
-            print(f"\n=== run_number={run_number} ===")
+                    "TurbulencLayer": TurbulencLayer,
+                }
+            print(f"\n=== run_number={run_number} finished out of {len(r0_list) * len(wavelengths) * N  } ({run_number/(len(r0_list) * len(wavelengths) * N  ) * 100:.3f}%) ===")
             exec(code_obj, ns,ns)  # fresh globals per run (no locals dict)
