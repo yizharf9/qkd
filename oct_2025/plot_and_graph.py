@@ -118,9 +118,9 @@ def rest_of_code(stats,wl_col,val_col,df,x_axis,after,r0_col):
         d = d.sort_values(x_axis)
         plt.plot(d[x_axis], d['mean'], label=f"λ = {wl:g} (mean)")
         plt.fill_between(d[x_axis], d['min'], d['max'], alpha=0.2, linewidth=0)
-
-    plt.xlabel(x_axis)
-    plt.ylabel(val_col)
+    
+    plt.xlabel(x_axis+"[m]")
+    plt.ylabel(val_col+"[%]")
     plt.title(f"{val_col} vs {x_axis} — mean with min–max band per wavelength")
     plt.grid(True, alpha=0.3)
     plt.legend()
@@ -237,8 +237,8 @@ def rest_of_code(stats,wl_col,val_col,df,x_axis,after,r0_col):
     ax.yaxis.set_minor_formatter(NullFormatter())
 
     # Labels / title
-    ax.set_xlabel(x_axis + " (log scale)")
-    ax.set_ylabel(val_col + " (log scale)")
+    ax.set_xlabel(x_axis +" [m] " +"(log scale)")
+    ax.set_ylabel(val_col + " [W] "+ "(log scale)")
     ax.set_title(f"{val_col} vs {x_axis} — dots + mean (log–log)")
 
     # Grid on both major & minor
