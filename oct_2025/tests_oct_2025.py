@@ -2,13 +2,16 @@ import plot_and_graph as pag
 import pytest
 print("All modules imported successfully.")
 # save_images:
-"only 1 group of images are saved per run of massive_simulation.py based on user input at the begining of massive_simulation.py"
-
-# plots_and_graph: Cn2 handling
-
-# flag_turbalence_layer: 
+"✅only 1 group of images are saved per run of massive_simulation.py based on user input at the begining of massive_simulation.py"
+#TODO
 """
-Add the flag to control whether turbulence layer is applied or not in single_simulation.py
+
+#✅ plots_and_graph: Cn2 handling
+
+# ✅flag_turbalence_layer: 
+
+""""""
+✅Add the flag to control whether turbulence layer is applied or not in single_simulation.py
 """
 #-------tests for graphs and plots-------------------
 #tests for plots_and_graph.py with Cn2 as r0_col§

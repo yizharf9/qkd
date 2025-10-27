@@ -52,9 +52,16 @@ for wavelength in wavelengths :
                     "wavelength": wavelength,
                     "r0_ref": r0_ref,  # example value for r0_ref
                     "save_images": save_images,  # example value for r0_ref
+<<<<<<< HEAD
                     "TurbulencLayer": TurbulencLayer,
                 }
             print(f"\n=== run_number={count - 1} finished out of {len(r0_list) * len(wavelengths) * N  } ({count/(len(r0_list) * len(wavelengths) * N  ) * 100:.3f}%) ===")
+=======
+                    "TurbulencLayer": True,
+               }
+
+            print(f"\n=== run_number={run_number} ===")
+>>>>>>> c30cd50 (look for what_is_new.ipynb)
             exec(code_obj, ns,ns)  # fresh globals per run (no locals dict)
             count += 1
 

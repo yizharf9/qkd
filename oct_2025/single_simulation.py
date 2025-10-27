@@ -13,19 +13,19 @@ utils.check_dir()
 try:
     TurbulencLayer
 except NameError:
-    TurbulencLayer = True
+    TurbulencLayer = False
 try:
     run_number
 except NameError:
-    run_number= 26
+    run_number= 0
 try:
     wavelength
 except NameError:
-    wavelength = 1.55e-6
+    wavelength = 1.234e-6
 try:
     r0_ref
 except NameError:
-    r0_ref = 0.2
+    r0_ref = 0.1234
 try:
     save_images
 except NameError:
@@ -83,6 +83,7 @@ except TypeError:
 if TurbulencLayer is True:
     wf1 = layer(wf0)      
 else:
+    r0_ref=1e+9
     wf1=wf0           # wavefront AFTER turbulence
 psf1 = prop(wf1).power           # instantaneous PSF with turbulence
 
@@ -126,6 +127,7 @@ print(f"Total power:      {power1_total:.6e} (relative)")
 print(f"Fractional power: {frac1:.6%}")
 #endregion
 # ---------- 8) Optional: overlay circle on both PSFs ----------
+<<<<<<< HEAD
 if save_images:
     phase_screen = layer.phase_for(wavelength)          # Field on the pupil grid (radians)
 
@@ -166,5 +168,146 @@ if save_images:
     plt.savefig(out_path, dpi=300, bbox_inches="tight")
     print(f"✅ Saved combined figure to: {out_path}")
     plt.close(fig)
+=======
+phase_screen = layer.phase_for(wavelength)          # Field on the pupil grid (radians)
+
+# pupil-plane extent (meters -> mm for readability)
+scale_mm = 1e3
+xmin_p, xmax_p = pupil_grid.x.min()*scale_mm, pupil_grid.x.max()*scale_mm
+ymin_p, ymax_p = pupil_grid.y.min()*scale_mm, pupil_grid.y.max()*scale_mm
+extent_pupil_mm = [xmin_p, xmax_p, ymin_p, ymax_p]
+
+# focal-plane extent (מחשבים מהמוקד)
+f_m = f_eff
+xmin_m = psf0.grid.x.min()*f_m; xmax_m = psf0.grid.x.max()*f_m
+ymin_m = psf0.grid.y.min()*f_m; ymax_m = psf0.grid.y.max()*f_m
+extent_focal_mm = [xmin_m*scale_mm, xmax_m*scale_mm, ymin_m*scale_mm, ymax_m*scale_mm]
+
+# 1) Figure & axes
+
+if TurbulencLayer:
+    image_amount=3
+else:
+    image_amount=2
+
+if save_images:
+    fig, axes = plt.subplots(1, image_amount, figsize=(14, 4.5), dpi=150)
+
+# --- (a) Phase screen (pupil plane) ---
+    if TurbulencLayer:
+        ax = axes[0]
+        im_phase = ax.imshow(phase_screen.shaped, origin='lower', cmap='RdBu',
+                            vmin=-np.pi, vmax=np.pi, extent=extent_pupil_mm)
+        ax.set_title("Turbulence phase screen [rad]")
+        ax.set_xlabel('x [mm]'); ax.set_ylabel('y [mm]')
+        ax.set_aspect('equal', adjustable='box')
+        div = make_axes_locatable(ax); cax = div.append_axes("right", size="5%", pad=0.06)
+        cb = fig.colorbar(im_phase, cax=cax); cb.set_label('Phase [rad]')
+
+# helper לציור PSF
+def plot_psf_on(ax, psf, title):
+    psf_img = np.log10((psf / psf.max()).shaped + 1e-12)
+    im = ax.imshow(psf_img, origin='lower', extent=extent_focal_mm,
+                   cmap='inferno', vmin=-6, vmax=0)
+    circ = mpatches.Circle((0.0, 0.0), radius=alpha*f_m*scale_mm,
+                           fill=False, linewidth=1.5)
+    ax.add_patch(circ)
+    ax.set_title(title)
+    ax.set_xlabel('x [mm]'); ax.set_ylabel('y [mm]')
+    ax.set_aspect('equal', adjustable='box')
+    div = make_axes_locatable(ax); cax = div.append_axes("right", size="5%", pad=0.06)
+    cb = fig.colorbar(im, cax=cax)
+    cb.set_label(r'$\log_{10}(\mathrm{Intensity}/\max)$')
+
+
+
+
+
+"""
+
+# ---------- 8) One figure with: [phase | PSF before | PSF after] ----------
+import matplotlib.patches as mpatches
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+# 0) Data & extents
+
+
+
+
+
+"""
+if save_images:
+        # --- (b) Unaberrated PSF ---
+    plot_psf_on(axes[image_amount-2], psf0, "Unaberrated PSF (before)")
+
+    # --- (c) Turbulent PSF ---
+    plot_psf_on(axes[image_amount-1], psf1, "Turbulent PSF (after)")
+
+    plt.tight_layout()
+
+    # save or show (תמיד נשמור לאותה תיקייה כמו קודם)
+    base_output_dir = 'simulation_output'
+    os.makedirs(base_output_dir, exist_ok=True)
+    out_path = os.path.join(
+        base_output_dir,
+        f"phase_psf_wl_{wavelength*1e6:.2f}um_r0ref_{r0_ref*1e3:.1f}mm_run_{run_number}.png"
+    )
+    plt.savefig(out_path, dpi=300, bbox_inches="tight")
+    print(f"✅ Saved combined figure to: {out_path}")
+    plt.close(fig)
+    """
+    import matplotlib.patches as mpatches
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+#yassume: psf is an HCIPy Field on a focal grid with angular coords (rad)
+    fg = psf0.grid                        # same grid for psf1
+    f_m = f_eff          # <-- set this to your f
+    # compute image extents in meters using the grid limits (in rad) times f
+    scale = 1e3   # m -> mm
+    xmin_m, xmax_m = fg.x.min()*f_m, fg.x.max()*f_m
+    ymin_m, ymax_m = fg.y.min()*f_m, fg.y.max()*f_m
+    extent_mm = [xmin_m*scale, xmax_m*scale, ymin_m*scale, ymax_m*scale]
+
+    # plot using plain matplotlib imshow with 'extent' in meters
+    fig, axes = plt.subplots(1,2, figsize=(9,4), dpi=150)
+    fig, axes = plt.subplots(1, 2, figsize=(9, 4), dpi=150)
+
+    for ax, psf, title in zip(
+        axes, [psf0, psf1],
+        ["Unaberrated PSF (before)", "Turbulent PSF (after)"]
+    ):
+        """"""
+        im = ax.imshow(psf_img, origin='lower', extent=extent_mm, cmap='inferno', vmin=-6, vmax=0)
+
+        """"""
+        psf_img = np.log10((psf / psf.max()).shaped + 1e-12)  # key fix
+        im = ax.imshow(psf_img,
+                    origin='lower',
+                    extent=extent_mm,
+                    cmap='inferno', vmin=-6, vmax=0)
+
+        circ = mpatches.Circle((0.0, 0.0), radius=alpha*f_m*scale, fill=False, linewidth=1.5)
+        ax.add_patch(circ)
+        ax.set_title(title)
+        ax.set_xlabel('x [mm]')
+        ax.set_ylabel('y [mm]')
+
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.06)
+        cb = fig.colorbar(im, cax=cax)
+        cb.set_label(r'$\log_{10}(\mathrm{Intensity}/\max)$')
+
+    # run these ONCE after the loop
+    plt.tight_layout()
+
+    base_output_dir = 'simulation_output'
+    os.makedirs(base_output_dir, exist_ok=True)
+    output_path = os.path.join(
+        base_output_dir,
+        f"wavelength_{wavelength*1e6:.2f}um_r0_ref_{r0_ref*1e3:.1f}mm_run_{run_number}.png"
+    )
+    plt.savefig(output_path, dpi=300)
+    plt.close()
+    """
+>>>>>>> c30cd50 (look for what_is_new.ipynb)
 
 utils.update_csv(wavelength, r0_ref, run_number,power0_in_bucket,power0_total,frac0,power1_in_bucket,power1_total,frac1)
