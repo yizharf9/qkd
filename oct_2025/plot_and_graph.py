@@ -1,7 +1,4 @@
-<<<<<<< HEAD
 path_file="./massive_output.csv"
-=======
->>>>>>> c30cd50 (look for what_is_new.ipynb)
 #wavelength,r0_ref,run_number,power_in_bucket_before_turbulance,total_power_before_turbulance,precentage_before_turbulance,power_in_bucket_after_turbulance,total_power_after_turbulance,precentage_after_turbulance,time
 # run this to plot the massive_output.csv file
 import pandas as pd
@@ -13,7 +10,7 @@ import itertools
 from matplotlib.ticker import LogLocator, NullFormatter, ScalarFormatter
 import numpy as np
 
-path_file="/Users/idoshlomy/Documents/qkd/oct_2025/massive_output.csv"
+#path_file="/Users/idoshlomy/Documents/qkd/oct_2025/massive_output.csv"
 #--- 0) Ensure correct working directory ---
 
 
