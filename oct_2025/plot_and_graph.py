@@ -28,7 +28,7 @@ def setup():
     print("-" * 60) # Visual separator
     setup_values["after"] =True
     setup_values["run_Cn2"] = False
-    setup_values["TO_run"]= False
+    setup_values["TO_run"]= True
     return setup_values
 # --- 1) Load CSV ---
 def Load_csv(path_file):
@@ -55,7 +55,7 @@ def pick(colnames, *candidates):
 #df=df.sorted()
  # for after , for before set to False
 
-def proces_file(df,after):
+def proces_file(df):
     proces_values={}
     print(f"Loaded {len(df)} rows from {path_file}")
     r0_col  = pick(df.columns, "r0", "r_0", "r0_ref", "r_0_ref")
