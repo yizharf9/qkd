@@ -151,14 +151,14 @@ if save_images:
     fig, axes = plt.subplots(2, 3, figsize=(14, 4.5), dpi=150)
 
     # --- (a) Phase screen (pupil plane) ---
-    utils.plot_phase_screen(fig,axes[0,0],phase_screen,extent_pupil_mm,"Atmosphere Phase")
-    utils.plot_psf_on(fig,axes[1,0],power_screen,alpha,f_m,extent_focal_mm,scale_mm,"Atmosphere PSF")
+    utils.plot_phase_screen(fig,axes[0,0],phase_screen,extent_pupil_mm,title="Atmosphere Phase")
+    utils.plot_psf_on(fig,axes[1,0],power_screen,alpha,f_m,extent_focal_mm,scale_mm,title="Atmosphere PSF")
     # --- (b) Unaberrated PSF ---
-    utils.plot_phase_screen(fig,axes[0,1],phase_screen,extent_pupil_mm , "Unaberrated Phase (before)")
-    utils.plot_psf_on(fig,axes[1,1], psf0,alpha,f_m,extent_focal_mm,scale_mm, "Unaberrated PSF (before)")
+    utils.plot_phase_screen(fig,axes[0,1],phase0,extent_pupil_mm , title="Unaberrated Phase (before)")
+    utils.plot_psf_on(fig,axes[1,1], psf0,alpha,f_m,extent_focal_mm,scale_mm, title="Unaberrated PSF (before)")
     # --- (c) Turbulent PSF ---
-    utils.plot_phase_screen(fig,axes[0,2],phase1,extent_pupil_mm,"Turbulent Phase (after)")
-    utils.plot_psf_on(fig,axes[1,2], psf1,alpha,f_m,extent_focal_mm,scale_mm, "Turbulent PSF (after)")
+    utils.plot_phase_screen(fig,axes[0,2],phase_screen,extent_pupil_mm,mask = ap,title="Turbulent Phase (after)")
+    utils.plot_psf_on(fig,axes[1,2], psf1,alpha,f_m,extent_focal_mm,scale_mm,title="Turbulent PSF (after)")
     
     plt.tight_layout()
 

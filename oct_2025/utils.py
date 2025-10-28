@@ -71,10 +71,14 @@ def update_csv( wavelength,
     print("Operation complete. Data has been saved.")
 
 # helper לציור phase_screen
-def plot_phase_screen(fig,ax,phase_screen,extent_pupil_mm,title="Turbulence phase screen [rad]",mask = None):
+def plot_phase_screen(fig,ax,phase_screen,extent_pupil_mm,mask=None,title="Turbulence phase screen [rad]"):
     # ax = axes[0]    
-    im_phase_field = imshow_field(phase_screen,mask=mask)
-    im_phase = ax.show(im_phase_field, origin='lower', cmap='RdBu',vmin=-np.pi, vmax=np.pi, extent=extent_pupil_mm)
+    # print(str(mask.shape) + "!!!!!")
+    if mask is not None:
+        im_phase_field = imshow_field(phase_screen,ax=ax,mask=mask, cmap='RdBu',vmin=-np.pi, vmax=np.pi)
+    else:
+        im_phase_field = imshow_field(phase_screen,ax=ax,cmap='RdBu',vmin=-np.pi, vmax=np.pi)
+    # im_phase = ax.show(im_phase_field, origin='lower', cmap='RdBu',vmin=-np.pi, vmax=np.pi, extent=extent_pupil_mm)
     ax.set_title(title)
     ax.set_xlabel('x [mm]')
     ax.set_ylabel('y [mm]')
@@ -82,7 +86,7 @@ def plot_phase_screen(fig,ax,phase_screen,extent_pupil_mm,title="Turbulence phas
     
     div = make_axes_locatable(ax)
     cax = div.append_axes("right", size="5%", pad=0.06)
-    cb = fig.colorbar(im_phase, cax=cax)
+    cb = fig.colorbar(im_phase_field, cax=cax)
     cb.set_label('Phase [rad]')
 
 # helper לציור PSF
