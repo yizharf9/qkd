@@ -10,11 +10,7 @@ import itertools
 from matplotlib.ticker import LogLocator, NullFormatter, ScalarFormatter
 import numpy as np
 
-<<<<<<< HEAD
-#path_file="/Users/idoshlomy/Documents/qkd/oct_2025/massive_output.csv"
-=======
 path_file="./massive_output.csv"
->>>>>>> 6187581 (commit before push)
 #--- 0) Ensure correct working directory ---
 
 

@@ -4,6 +4,8 @@ import pandas as pd
 import datetime
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+from matplotlib import animation
+from IPython.display import HTML
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 try:
     from hcipy import *
@@ -69,10 +71,11 @@ def update_csv( wavelength,
     print("Operation complete. Data has been saved.")
 
 # helper לציור phase_screen
-def plot_phase_screen(fig,ax,phase_screen,extent_pupil_mm):
-    # ax = axes[0]
-    im_phase = ax.imshow(phase_screen.shaped, origin='lower', cmap='RdBu',vmin=-np.pi, vmax=np.pi, extent=extent_pupil_mm)
-    ax.set_title("Turbulence phase screen [rad]")
+def plot_phase_screen(fig,ax,phase_screen,extent_pupil_mm,title="Turbulence phase screen [rad]",mask = None):
+    # ax = axes[0]    
+    im_phase_field = imshow_field(phase_screen,mask=mask)
+    im_phase = ax.show(im_phase_field, origin='lower', cmap='RdBu',vmin=-np.pi, vmax=np.pi, extent=extent_pupil_mm)
+    ax.set_title(title)
     ax.set_xlabel('x [mm]')
     ax.set_ylabel('y [mm]')
     ax.set_aspect('equal', adjustable='box')
@@ -83,7 +86,7 @@ def plot_phase_screen(fig,ax,phase_screen,extent_pupil_mm):
     cb.set_label('Phase [rad]')
 
 # helper לציור PSF
-def plot_psf_on(fig,ax, psf,alpha,f_m,extent_focal_mm,scale_mm, title):
+def plot_psf_on(fig,ax, psf,alpha,f_m,extent_focal_mm,scale_mm, title = "PSF plot"):
     psf_img = np.log10((psf / psf.max()).shaped + 1e-12)
     im = ax.imshow(psf_img, origin='lower', extent=extent_focal_mm,cmap='inferno', vmin=-6, vmax=0)
     circ = mpatches.Circle((0.0, 0.0), radius=alpha*f_m*scale_mm,fill=False, linewidth=1.5)
@@ -96,9 +99,7 @@ def plot_psf_on(fig,ax, psf,alpha,f_m,extent_focal_mm,scale_mm, title):
     cb = fig.colorbar(im, cax=cax)
     cb.set_label(r'$\log_{10}(\mathrm{Intensity}/\max)$')
 
-from matplotlib import animation
-from IPython.display import HTML
-import matplotlib.pyplot as plt
+
 
 def animate_wavefronts(images_folder_dir,image_titles=None, interval=50, repeat_delay=1000):
     """Creates an animation from a list of Matplotlib image artists.
