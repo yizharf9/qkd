@@ -31,7 +31,8 @@ def update_csv( wavelength,
                 precentage_before,
                 power_in_bucket_after,
                 total_power_after,
-                precentage_after
+                precentage_after,
+                conservation_of_energy,
                 ):
 
     file_path = "./massive_output.csv"
@@ -45,6 +46,7 @@ def update_csv( wavelength,
         "power_in_bucket_after_turbulance",
         "total_power_after_turbulance",
         "precentage_after_turbulance",
+        "conservation of energy[%]"
         "time"
         ]
 
@@ -60,7 +62,7 @@ def update_csv( wavelength,
         "power_in_bucket_after_turbulance": power_in_bucket_after,
         "total_power_after_turbulance": total_power_after,
         "precentage_after_turbulance": precentage_after,
-        
+        "conservation of energy[%]" : conservation_of_energy,
         "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }])
 
