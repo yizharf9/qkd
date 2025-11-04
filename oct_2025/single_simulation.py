@@ -26,7 +26,7 @@ except NameError:
 try:
     r0_ref
 except NameError:
-    r0_ref = 0.05
+    r0_ref = 0.1
 try:
     save_images
 except NameError:
@@ -45,23 +45,26 @@ eps = D_obs / D # central obscuration ratio
 spider_w = 0.05         # [m]
 oversz = 16.0/15.0
 N = int(240 * oversz) #256 # number of pixels across pupil diameter
+N=512
 pupil_grid = make_pupil_grid(N, D * oversz)
 
 ap_gen = make_obstructed_circular_aperture(D, eps, num_spiders=4, spider_width=spider_w)
 ap = evaluate_supersampled(ap_gen, pupil_grid, 4) 
-
+ref_wavelength=8e-7
 # ---------- 2) Wavelength & focal grid ----------
 # wavelength = 2.2e-6  # [m] science wavelength
-q = 4
-num_airy = 30
+q = 8
+num_airy = 60
 spatial_res = wavelength / D  # [rad] per λ/D
 focal_grid = make_focal_grid(q=q, num_airy=num_airy, spatial_resolution=spatial_res)
 
 prop = FraunhoferPropagator(pupil_grid, focal_grid) # transforms from pupil_grid to focal_grid
 
 # ---------- 3) Wavefront (before turbulence) ----------
-wf0 = Wavefront(ap, wavelength)
+wf0=Wavefront(ap,wavelength) #wf_pupil
+#wf0.electric_field = Wavefront(ap, wavelength).electric_field+Wavefront(ap,ref_wavelength).electric_field
 # wf0.total_power = 1.0
+
 psf0 = prop(wf0).power  # unaberrated PSF (relative units)
 phase0 = prop(wf0).phase  # unaberrated PSF (relative units)
 
@@ -89,7 +92,7 @@ else:
     wf1=wf0           # wavefront AFTER turbulence
 psf1 = prop(wf1).power           # instantaneous PSF with turbulence
 phase1 = prop(wf1).phase           # instantaneous PSF with turbulence
-
+Wf_in_focal=prop(wf1)
 # ---------- 5) Bucket definition: 9 µm circle in focal plane ----------
 Fnum_sci = 50.0                 # adjust to your optics if needed 
 f_eff = Fnum_sci * D            # [m] effective focal length
@@ -128,6 +131,20 @@ print("\n-- AFTER turbulence (instantaneous) --")
 print(f"Power in bucket:  {power1_in_bucket:.6e} (relative)")
 print(f"Total power:      {power1_total:.6e} (relative)")
 print(f"Fractional power: {frac1:.6%}")
+#check for energy conservation
+
+print("*"*80)
+I_grid=np.abs(wf1.electric_field)**2
+I_focal=np.abs(Wf_in_focal.electric_field)**2
+weights_grid=wf1.grid.weights
+weights_focal=Wf_in_focal.grid.weights
+
+print("wf1 power: ",np.sum(I_grid*weights_grid))
+print("focal power: ",np.sum(I_focal*weights_focal))
+Energy_conv=str(100*np.sum(I_focal*weights_focal)/(np.sum(I_grid*weights_grid)))
+print(Energy_conv)
+print("*"*80)
+
 #endregion
 # ---------- 8) Optional: overlay circle on both PSFs ----------
 if save_images:
@@ -140,6 +157,7 @@ if save_images:
     ymin_p, ymax_p = pupil_grid.y.min()*scale_mm, pupil_grid.y.max()*scale_mm
     extent_pupil_mm = [xmin_p, xmax_p, ymin_p, ymax_p]
 
+    
     # focal-plane extent (מחשבים מהמוקד)
     f_m = f_eff
     xmin_m = psf0.grid.x.min()*f_m
@@ -173,4 +191,4 @@ if save_images:
     print(f"✅ Saved combined figure to: {out_path}")
     plt.close(fig)
 
-utils.update_csv(wavelength, r0_ref, run_number,power0_in_bucket,power0_total,frac0,power1_in_bucket,power1_total,frac1)
+utils.update_csv(wavelength, r0_ref, run_number,power0_in_bucket,power0_total,frac0,power1_in_bucket,power1_total,frac1,conservation_of_energy=Energy_conv)
