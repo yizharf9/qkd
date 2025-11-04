@@ -40,7 +40,7 @@ r0_list = np.linspace(start=start,stop=end,num=num_of_r0_samples,)
 wavelengths = [1.55e-6, 0.500e-6]
 
 # num of runs for values specified values
-N = 4
+N = 100
 count = 1
 for wavelength in wavelengths :
     for r0_ref in r0_list :
