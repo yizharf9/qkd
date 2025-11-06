@@ -7,11 +7,15 @@ import os
 from hcipy import *
 import numpy as np
 import utils
-
+from math import e
 #-------prams
 To_run=True
 after=True
 path_file="./massive_output.csv"
+#_-----prams for calculations
+lam_ref = 500e-9  
+SR_SHORT_COEFF = 0.134
+D=8
 #--- 0) Ensure correct working directory ---
 utils.check_dir()
 # --- 1) Load CSV ---
@@ -44,9 +48,10 @@ def proces_file(df):
         raise ValueError(f"Need columns for r0, smf, wavelength. Found: {list(df.columns)}")
     # --- 4) Clean types ---
     df[r0_col]  = pd.to_numeric(df[r0_col], errors="coerce")
+    df['actual_r0_col'] = df[r0_col] * (df[wl_col] / lam_ref) ** (6.0 / 5.0)    
     df[smf_col] = pd.to_numeric(df[smf_col], errors="coerce")
     df[wl_col]  = pd.to_numeric(df[wl_col], errors="coerce")
-    df = df.dropna(subset=[r0_col, wl_col])
+    df = df.dropna(subset=['actual_r0_col', wl_col])
     df["Cn2"]= Cn_squared_from_fried_parameter(df[r0_col],df[wl_col]).to_numpy()
     df["Cn2"] =pd.to_numeric(df["Cn2"], errors="coerce")
     df[conservation_of_energy]=pd.to_numeric(df[conservation_of_energy],errors="coerce")
@@ -82,10 +87,22 @@ if To_run:
     proces_values=proces_file(df)
     r0_col=proces_values["r0_col"]
     x_axis=check_axis(run_Cn2=False,r0_col=r0_col)
+    print(df[r0_col][0])
     stats,wl_col,val_col,df=[0]*4
     stats,wl_col,val_col,df,cof=proces_values["stats"],proces_values["wl_col"],\
     proces_values["val_col"],proces_values["df"],proces_values["COF"]
     params=[stats,wl_col,val_col,df,x_axis,after,r0_col]
     #rest_of_code(stats,wl_col,val_col,df,x_axis,after,r0_col)
-    utils.plot_dots_mean_by_scale(df,stats,wl_col,x_axis=x_axis,y_col=val_col,x_mode="log",y_mode="log",title="Phase and amplitude at different stages",show=True)
-    utils.plot_dots_mean_by_scale(df,stats,wl_col,x_axis=x_axis,y_col=cof,x_mode="lin",y_mode="lin",title="Percentage of energy conservation",show=True)
+    r0=0.1
+    r_ref=0.1* (1.55e-6/lam_ref) ** (6.0 / 5.0)   
+    D_over_r0 = D /r_ref
+    print("r_ref:",r_ref)
+
+    """
+    1.55e-06,0.1,0,0.5732063905798354,48.01889078999652,0.011937101860321354,0.0133460713186899,47.96155491325191,0.00027826602667134015,99.36935463098774,2025-11-04 18:44:29
+    """
+    print("SR: ",100*np.exp(-SR_SHORT_COEFF*((D_over_r0)** (5.0 / 3.0))))
+    SR_theoretical = np.exp(-SR_SHORT_COEFF * (D_over_r0) ** (5.0 / 3.0)) 
+    utils.plot_dots_mean_by_scale(df,stats,wl_col,x_axis=x_axis,y_col=val_col,x_mode="log",y_mode="log",title="Phase and amplitude at different stages",show=False)
+    utils.plot_dots_mean_by_scale(df,stats,wl_col,x_axis=x_axis,y_col=cof,x_mode="lin",y_mode="lin",title="Percentage of energy conservation",show=False)
+    utils.plot_simulated_vs_theoretical_sr(df,stats,wl_col,x_axis,val_col,"Percentage of energy conservation with rispect to SR",show=True)

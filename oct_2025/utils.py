@@ -8,7 +8,8 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib import animation
 from IPython.display import HTML
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+#from mpl_toolkits.axes_grid1 import make_axes_locatable
+#from hcipy import *
 try:
     from hcipy import *
 except Exception as e:
@@ -28,6 +29,7 @@ def check_dir():
 def update_csv( wavelength,
                 r0_ref_val,
                 run_num,
+                focal_dim,
                 power_in_bucket_before,
                 total_power_before,
                 precentage_before,
@@ -42,6 +44,7 @@ def update_csv( wavelength,
         "wavelength",
         "r0_ref",
         "run_number",
+        "focsl_dim"
         "power_in_bucket_before_turbulance",
         "total_power_before_turbulance",
         "precentage_before_turbulance",
@@ -56,7 +59,7 @@ def update_csv( wavelength,
         "wavelength": wavelength,
         "r0_ref": r0_ref_val,
         "run_number": run_num,
-        
+        "focal_dim":focal_dim,
         "power_in_bucket_before_turbulance": power_in_bucket_before,
         "total_power_before_turbulance": total_power_before,
         "precentage_before_turbulance": precentage_before,
@@ -312,3 +315,12 @@ def plot_dots_mean_by_scale(
     plt.close(fig)
 
     return save_path
+def time_asstimate(current_time,begin_time,current_run,num_of_run): 
+    """
+    return the number in sec until the code is finish 
+    assume linear progression 
+    """
+    runtime=current_time-begin_time #time the code is running
+    avg_TFR=runtime/current_run #avg time for run
+    return avg_TFR*num_of_run-runtime
+
