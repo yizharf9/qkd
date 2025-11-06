@@ -28,6 +28,11 @@ try:
 except NameError:
     r0_ref = 0.1
 try:
+    focal_dim
+except NameError:
+    focal_dim=9e-6
+
+try:
     save_images
 except NameError:
     save_images_prompt = input("Save images (y/n)? ")
@@ -56,7 +61,7 @@ ref_wavelength=8e-7
 q = 8
 num_airy = 60
 spatial_res = wavelength / D  # [rad] per λ/D
-focal_grid = make_focal_grid(q=q, num_airy=num_airy, spatial_resolution=spatial_res)
+focal_grid = make_focal_grid(q=q, num_airy=num_airy,spatial_resolution=spatial_res, pupil_diameter=D,focal_length=focal_dim)
 
 prop = FraunhoferPropagator(pupil_grid, focal_grid) # transforms from pupil_grid to focal_grid
 
@@ -66,7 +71,7 @@ wf0=Wavefront(ap,wavelength) #wf_pupil
 # wf0.total_power = 1.0
 
 psf0 = prop(wf0).power  # unaberrated PSF (relative units)
-phase0 = prop(wf0).phase  # unaberrated PSF (relative units)
+phase0 = prop(wf0).phase  # unaberrated PSF (relative unitxs)
 
 # ---------- 4) Single-layer turbulence ----------
 seeing = 0.6       # [arcsec] @ 500 nm
@@ -137,11 +142,14 @@ print("*"*80)
 I_grid=np.abs(wf1.electric_field)**2
 I_focal=np.abs(Wf_in_focal.electric_field)**2
 weights_grid=wf1.grid.weights
+print(weights_grid)
 weights_focal=Wf_in_focal.grid.weights
-
-print("wf1 power: ",np.sum(I_grid*weights_grid))
-print("focal power: ",np.sum(I_focal*weights_focal))
-Energy_conv=str(100*np.sum(I_focal*weights_focal)/(np.sum(I_grid*weights_grid)))
+print(weights_focal)
+Wf_in_focal_power=np.sum(Wf_in_focal.power)
+wf1_power=np.sum(wf1.power)
+print("wf1 power: ",np.sum(Wf_in_focal.power))
+print("focal power: ",np.sum(wf1.power))
+Energy_conv=100*Wf_in_focal_power/wf1_power
 print(Energy_conv)
 print("*"*80)
 
@@ -191,4 +199,4 @@ if save_images:
     print(f"✅ Saved combined figure to: {out_path}")
     plt.close(fig)
 
-utils.update_csv(wavelength, r0_ref, run_number,power0_in_bucket,power0_total,frac0,power1_in_bucket,power1_total,frac1,conservation_of_energy=Energy_conv)
+utils.update_csv(wavelength, r0_ref, run_number,focal_dim,power0_in_bucket,power0_total,frac0,power1_in_bucket,power1_total,frac1,conservation_of_energy=Energy_conv)
