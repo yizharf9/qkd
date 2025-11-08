@@ -4,12 +4,14 @@ from pathlib import Path
 import numpy as np
 import datetime as dt
 import time
+import math
+print(math.e)
+from params import massive_simulation_begin_massage 
 utils.check_dir()
-print("\n")
-print("Starting massive simution runs...")
-print("Current working directory:", os.getcwd())
-print("Script start time:", dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S") )
-
+try:
+    print(massive_simulation_begin_massage)
+except NameError:
+    print(2)
 path_file="./single_simulation.py" #! <=== needs to be relative path to work
 # edit as needed
 save_images_prompt = input("save images (y/n) ?  ") #! <=== change to save photos in single turblance.py run 
@@ -66,8 +68,9 @@ for focal in focal_dim:
                 current_time_for_run=time.time()
                 count += 1
                 T2FInish=utils.time_asstimate(current_time_for_run,time_for_start,count,number_of_runs)
-                print("Time asstimate to finish: "+str(int(T2FInish/60))+"minutes")
+                print("Time asstimate to finish: "+str(int(T2FInish/60))+" minutes")
 "run without TurbulencLayer"
+count = 1
 for focal in focal_dim:
     for wavelength in wavelengths :
         for r0_ref in r0_list :

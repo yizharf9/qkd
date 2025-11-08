@@ -93,7 +93,7 @@ except TypeError:
 if TurbulencLayer is True:
     wf1 = layer(wf0)      
 else:
-    r0_ref=1e+9
+    r0_ref=1
     wf1=wf0           # wavefront AFTER turbulence
 psf1 = prop(wf1).power           # instantaneous PSF with turbulence
 phase1 = prop(wf1).phase           # instantaneous PSF with turbulence

@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib import animation
 from IPython.display import HTML
-#from mpl_toolkits.axes_grid1 import make_axes_locatable
-#from hcipy import *
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from hcipy import *
 try:
     from hcipy import *
 except Exception as e:
@@ -38,6 +38,8 @@ def update_csv( wavelength,
                 precentage_after,
                 conservation_of_energy,
                 ):
+
+#head= wavelength ,r0_ref,run_number,focsl_dim,power_in_bucket_before_turbulance,total_power_before_turbulance,precentage_before_turbulance,power_in_bucket_after_turbulance,total_power_after_turbulance,precentage_after_turbulance,conservation_of_energy[%],time
 
     file_path = "./massive_output.csv"
     columns = [
@@ -183,138 +185,7 @@ def pick(colnames, *candidates):
             return hits[0]
     return None
 
-def _norm_scale_arg(mode: str) -> str:
-    """Normalize scale string to 'lin' or 'log'."""
-    if mode is None:
-        return 'lin'
-    m = str(mode).strip().lower()
-    return 'log' if m in {'log', 'log10', 'logarithmic'} else 'lin'
-
-def _pretty_x_units(x_axis: str) -> str:
-    """Optional: add units to x label if known."""
-    xl = x_axis.lower()
-    if xl == 'cn2' or 'cn2' in xl:
-        return " [m^(-2/3)]"
-    if 'r0' in xl or 'r_0' in xl:
-        return " [m]"
-    return ""
-
-def plot_dots_mean_by_scale(
-    df, stats,
-    wl_col: str,
-    x_axis: str,
-    y_col: str,
-    *,
-    x_mode='lin',          # 'lin' or 'log'
-    y_mode='lin',          # 'lin' or 'log'
-    after: bool = True,    # only for filename tag
-    outdir: str = "plots",
-    title: str = None,
-    show: bool = False
-):
-    """
-    Draws 'dots (rows) + mean line per wavelength' with selectable x/y scales.
-
-    Parameters
-    ----------
-    df : DataFrame
-        Row-level data containing columns wl_col, x_axis, y_col.
-    stats : DataFrame
-        Grouped stats with columns wl_col, x_axis and ['mean','min','max','count'] for y_col.
-    wl_col : str
-        Column name of wavelength.
-    x_axis : str
-        X variable column name (e.g., 'r0' or 'cn2').
-    y_col : str
-        Y variable column name (e.g., 'power_in_bucket_after_turbulance').
-    x_mode, y_mode : {'lin','log'}
-        Axis scaling modes (case-insensitive, accepts 'log10' etc. → 'log').
-    after : bool
-        Used only to tag the output filename.
-    outdir : str
-        Directory to save figure into.
-    title : str or None
-        Custom title; if None, a default is composed.
-    show : bool
-        If True, plt.show() after saving (can block on some systems).
-    """
-    x_mode = _norm_scale_arg(x_mode)
-    y_mode = _norm_scale_arg(y_mode)
-
-    # If any log scale, restrict to positive domain
-    work_df = df.copy()
-    work_stats = stats.copy()
-    if x_mode == 'log':
-        work_df = work_df[work_df[x_axis] > 0]
-        work_stats = work_stats[work_stats[x_axis] > 0]
-    if y_mode == 'log':
-        work_df = work_df[work_df[y_col] > 0]
-        # ensure mean/min/max positive as well
-        for c in ['mean', 'min', 'max']:
-            if c in work_stats:
-                work_stats = work_stats[work_stats[c] > 0]
-
-    if work_df.empty or work_stats.empty:
-        raise ValueError("No data to plot after applying scale/domain filters. "
-                         f"(x_mode={x_mode}, y_mode={y_mode})")
-
-    # Color per wavelength
-    unique_wls = sorted(work_df[wl_col].dropna().unique())
-    color_cycle = itertools.cycle(plt.rcParams['axes.prop_cycle'].by_key()['color'])
-    wl_color = {wl: next(color_cycle) for wl in unique_wls}
-
-    fig, ax = plt.subplots(figsize=(9, 6))
-
-    # Scatter points per λ
-    for wl, d in work_df.groupby(wl_col, sort=True):
-        ax.scatter(d[x_axis], d[y_col],
-                   s=14, alpha=0.55, linewidths=0,
-                   color=wl_color.get(wl), label=f"λ = {wl:g} (rows)")
-
-    # Mean lines per λ
-    for wl, d in work_stats.groupby(wl_col, sort=True):
-        d = d.sort_values(x_axis)
-        ax.plot(d[x_axis], d['mean'],
-                linewidth=2.2, color=wl_color.get(wl),
-                label=f"λ = {wl:g} (mean)")
-
-    # Scales
-    if x_mode == 'log':
-        ax.set_xscale('log')
-        ax.xaxis.set_major_locator(LogLocator(base=10.0))
-        ax.xaxis.set_minor_locator(LogLocator(base=10.0, subs=np.arange(2, 10) * 0.1))
-        ax.xaxis.set_minor_formatter(NullFormatter())
-    if y_mode == 'log':
-        ax.set_yscale('log')
-        ax.yaxis.set_major_locator(LogLocator(base=10.0))
-        ax.yaxis.set_minor_locator(LogLocator(base=10.0, subs=np.arange(2, 10) * 0.1))
-        ax.yaxis.set_minor_formatter(NullFormatter())
-
-    # Labels & title
-    x_unit = _pretty_x_units(x_axis)
-    x_lab = f"{x_axis}{x_unit}" + (" (log)" if x_mode == 'log' else "")
-    y_lab = f"{y_col}" + (" (log)" if y_mode == 'log' else "")
-    ax.set_xlabel(x_lab)
-    ax.set_ylabel(y_lab)
-    if title is None:
-        title = f"{y_col} vs {x_axis} — dots + mean ({x_mode}/{y_mode})"
-    ax.set_title(title)
-
-    ax.grid(True, which='both', alpha=0.3)
-    ax.legend(ncol=2, frameon=True)
-    fig.tight_layout()
-
-    # Save
-    os.makedirs(outdir, exist_ok=True)
-    fname = f"{y_col}_vs_{x_axis}_{'after' if after else 'before'}_{x_mode}-{y_mode}_{int(time.time())}.png"
-    save_path = os.path.join(outdir, fname)
-    fig.savefig(save_path, dpi=300, bbox_inches="tight")
-    print(f"✅ Saved plot to: {save_path}")
-    if show:
-        plt.show()
-    plt.close(fig)
-
-    return save_path
+#----------------time asstimate------------------------
 def time_asstimate(current_time,begin_time,current_run,num_of_run): 
     """
     return the number in sec until the code is finish 
@@ -323,4 +194,134 @@ def time_asstimate(current_time,begin_time,current_run,num_of_run):
     runtime=current_time-begin_time #time the code is running
     avg_TFR=runtime/current_run #avg time for run
     return avg_TFR*num_of_run-runtime
+#-----plots----------
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 
+def plot_mean_line_loglin(
+    df: pd.DataFrame,
+    wl_col: str,
+    focal_col: str,
+    wavelengths: list,
+    focals: list,
+    x_col: str,
+    y_col: str,
+    ax: plt.Axes,
+    title: str = None,
+    x_label: str = None,
+    y_label: str = None,
+    required_x_values: list = None,   # pass exact x values if you want strict enforcement; otherwise inferred
+    linewidth: float = 1.8,
+    marker: str = 'o',
+    markersize: float = 3.5,
+    strict_missing: bool = True       # raise error if x values missing for any (wl,focal)
+):
+    """
+    Plot mean(y_col) vs x_col on linear axes.
+    - linestyle encodes wavelength
+    - color encodes focal_dim
+    - returns the provided Axes (ax)
+    - raises ValueError if strict_missing and a (wl,focal) series is missing any required x values
+    """
+
+    # --- basic validation ---
+    for col in (wl_col, focal_col, x_col, y_col):
+        if col not in df.columns:
+            raise ValueError(f"Missing column '{col}' in DataFrame.")
+    if ax is None:
+        raise ValueError("Must pass a valid Matplotlib Axes (ax).")
+
+    # Work on a safe copy, ensure numeric
+    work = df.copy()
+    work[x_col] = pd.to_numeric(work[x_col], errors='coerce')
+    work[y_col] = pd.to_numeric(work[y_col], errors='coerce')
+    work = work.dropna(subset=[wl_col, focal_col, x_col, y_col])
+
+    # Filter to requested wavelengths & focals (keeps styling stable across subplots)
+    work = work[work[wl_col].isin(wavelengths) & work[focal_col].isin(focals)]
+
+    if work.empty:
+        raise ValueError("No data left after filtering by wavelengths and focal values.")
+
+    # --- style maps (color by focal, linestyle by wavelength) ---
+    # Colors from the default prop cycle (repeat if needed)
+    default_colors = plt.rcParams['axes.prop_cycle'].by_key().get('color', ['C0','C1','C2','C3','C4','C5','C6','C7','C8','C9'])
+    color_map = {fv: default_colors[i % len(default_colors)] for i, fv in enumerate(focals)}
+
+    linestyles = ['solid', 'dashed', 'dashdot', 'dotted']
+    ls_map = {wv: linestyles[i % len(linestyles)] for i, wv in enumerate(wavelengths)}
+
+    # --- aggregation: mean of y per (wl, focal, x) ---
+    g = (work
+         .groupby([wl_col, focal_col, x_col], as_index=False)[y_col]
+         .mean()
+        )
+
+    # --- required x values check ---
+    if required_x_values is None:
+        # infer exact x-grid from the data (strict)
+        required_x_values = np.sort(g[x_col].unique())
+    required_x_values = np.asarray(required_x_values)
+
+    # For fast membership test:
+    required_set = set(required_x_values.tolist())
+
+    # --- plot per (wl, focal) series ---
+    for wv in wavelengths:
+        for fv in focals:
+            sub = g[(g[wl_col] == wv) & (g[focal_col] == fv)]
+            if sub.empty:
+                if strict_missing:
+                    raise ValueError(f"No data for wavelength={wv}, focal={fv}.")
+                else:
+                    continue
+
+            # enforce exact x presence (strict “exact x values”)
+            series_x = np.sort(sub[x_col].to_numpy())
+            series_set = set(series_x.tolist())
+            if strict_missing and series_set != required_set and len(list(series_set-required_set)) > 0:
+                missing = sorted(list(required_set - series_set))
+                extra   = sorted(list(series_set - required_set))
+                raise ValueError(
+                    f"Series (wavelength={wv}, focal={fv}) has x mismatch.\n"
+                    f"  Missing x: {missing}\n"
+                    f"  Extra x:   {extra}"
+                )
+
+            # sort by x
+            sub = sub.sort_values(x_col, kind='mergesort')
+
+            ax.plot(
+                sub[x_col].to_numpy(),
+                sub[y_col].to_numpy(),
+                linestyle=ls_map[wv],
+                color=color_map[fv],
+                marker=marker,
+                markersize=markersize,
+                linewidth=linewidth,
+                label=f"λ={wv}, f={fv}"  # combined legend (we’ll also add split legends)
+            )
+
+    # --- labels, grid, title ---
+    if x_label:
+        ax.set_xlabel(x_label)
+    if y_label:
+        ax.set_ylabel(y_label)
+    if title:
+        ax.set_title(title)
+    ax.grid(True, which='both', linestyle=':', linewidth=0.7)
+    ax.set_xscale('log')
+    ax.set_yscale('linear')
+
+    # --- split legends: one for wavelength (linestyle), one for focal (color) ---
+    wl_handles = [Line2D([0], [0], color='black', linestyle=ls_map[wv], label=f"λ={wv}") for wv in wavelengths]
+    focal_handles = [Line2D([0], [0], color=color_map[fv], linestyle='solid', label=f"f={fv}") for fv in focals]
+
+    # Place legends without overlapping
+    leg1 = ax.legend(handles=wl_handles, title="Wavelength (linestyle)", loc='best')
+    ax.add_artist(leg1)
+    ax.legend(handles=focal_handles, title="Focal (color)", loc='best')
+
+    return ax
