@@ -5,3 +5,9 @@ massive_output_copy.csv
 .DS_Store
 what_is_new.ipynb
 simulation.ipynb
+OA.py
+OA.ipynb
+AO_*
+*.mp4
+test_plots.ipynb
+../.DS_Store

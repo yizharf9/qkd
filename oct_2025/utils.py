@@ -46,14 +46,14 @@ def update_csv( wavelength,
         "wavelength",
         "r0_ref",
         "run_number",
-        "focsl_dim"
+        "focsl_dim",
         "power_in_bucket_before_turbulance",
         "total_power_before_turbulance",
         "precentage_before_turbulance",
         "power_in_bucket_after_turbulance",
         "total_power_after_turbulance",
         "precentage_after_turbulance",
-        "conservation_of_energy[%]"
+        "conservation_of_energy[%]",
         "time"
         ]
 
@@ -69,7 +69,7 @@ def update_csv( wavelength,
         "power_in_bucket_after_turbulance": power_in_bucket_after,
         "total_power_after_turbulance": total_power_after,
         "precentage_after_turbulance": precentage_after,
-        "conservation of energy[%]" : conservation_of_energy,
+        "conservation_of_energy[%]" : conservation_of_energy,
         "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }])
 

@@ -43,15 +43,14 @@ focal_dim=[8,1,1e-3,500e-6,9e-6]
 wavelengths = [1.55e-6, 0.500e-6]
 
 # num of runs for values specified values
-N = 20 
+N = 5 
 N2=4
 count = 1
 time_for_start=time.time()
 "run with TurbulencLayer"
-for focal in focal_dim:
-    for wavelength in wavelengths :
-        for r0_ref in r0_list :
-            for run_number in range(1,N+1):  # example run number
+for wavelength in wavelengths :
+    for r0_ref in r0_list :
+        for run_number in range(1,N+1):  # example run number
                 ns = {
                         "__name__": "__main__",
                         "__file__": str("single_simulation.py"),   # so Path(__file__) works inside turblance.py
@@ -60,7 +59,7 @@ for focal in focal_dim:
                         "r0_ref": r0_ref,  # example value for r0_ref
                         "save_images": save_images,  # example value for r0_ref
                         "TurbulencLayer": TurbulencLayer,
-                        "focal_dim": focal,
+                        "USE_OA": True,
                     }
                 number_of_runs=len(r0_list) * len(wavelengths) * N *len(focal_dim)
                 print(f"\n=== run_number={count - 1} finished out of {number_of_runs } ({count/(number_of_runs) * 100:.3f}%) ===")

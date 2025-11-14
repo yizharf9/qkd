@@ -6,6 +6,8 @@ try:
     from hcipy import *
 except Exception as e:
     raise ImportError("HCIPy is required. Install it with: pip install hcipy") from e
+from tqdm.notebook import tqdm
+import scipy.ndimage as ndimage
 
 # ----------------------------- Directory Check -----------------------------
 utils.check_dir()
@@ -30,8 +32,11 @@ except NameError:
 try:
     focal_dim
 except NameError:
-    focal_dim=9e-6
-
+    focal_dim=None
+try:
+    USE_OA
+except NameError:
+    USE_OA = False
 try:
     save_images
 except NameError:
@@ -154,6 +159,160 @@ print(Energy_conv)
 print("*"*80)
 
 #endregion
+#------------
+if USE_OA:
+    wavelength_wfs=8e-7
+    num_modes = 30
+    num_modes = 30
+    dm_modes = make_disk_harmonic_basis(
+        pupil_grid, num_modes, D, 'neumann'
+    )
+    dm_modes = ModeBasis(
+        [mode / np.ptp(mode) for mode in dm_modes], pupil_grid
+    )
+    deformable_mirror = DeformableMirror(dm_modes)
+    deformable_mirror.flatten
+    response_matrix = []
+    probe_amp = 0.01 * wavelength_wfs
+
+    wf_calib = Wavefront(ap, wavelength_wfs)
+    wf_calib.total_power = 1.0
+    #---------SH WFS Setup-----------
+    f_number = 50
+    num_lenslets = 40
+    sh_diameter = 5e-3  # [m] SH beam diameter
+
+    magnification = sh_diameter / D
+    magnifier = Magnifier(magnification)
+    shwfs = SquareShackHartmannWavefrontSensorOptics(
+        pupil_grid.scaled(magnification),
+        f_number,
+        num_lenslets,
+        sh_diameter
+    )
+    spatial_resolution_wfs = wavelength_wfs / D      # [rad] per λ/D (roughly)
+    focal_grid_wfs = make_focal_grid(
+        q=4,
+        num_airy=2,             # enough to capture each SH spot
+        spatial_resolution=spatial_resolution_wfs,
+        pupil_diameter=D,
+        focal_length=None
+    )
+    shwfse = ShackHartmannWavefrontSensorEstimator(
+        shwfs.mla_grid,
+        shwfs.micro_lens_array.mla_index
+    )
+    wf_ref_wfs = Wavefront(ap, wavelength_wfs)
+    camera = NoiselessDetector(focal_grid_wfs)
+    camera.integrate(shwfs(magnifier(wf_ref_wfs)), 1.0)
+    image_ref = camera.read_out()
+    slopes_ref = shwfse.estimate([image_ref])
+    # ---- Select estimation subapertures based on flux ----
+    fluxes = ndimage.sum(image_ref, shwfse.mla_index, shwfse.estimation_subapertures)
+    flux_limit = fluxes.max() * 0.5  # לדוגמה – 50% מהפלוקס המקסימלי
+
+    estimation_subapertures = shwfs.mla_grid.zeros(dtype='bool')
+    estimation_subapertures[
+        shwfse.estimation_subapertures[fluxes > flux_limit]
+    ] = True
+
+    # בונים מחדש את ה-estimator עם רק הסאב־אפרצ’רים הטובים
+    shwfse = ShackHartmannWavefrontSensorEstimator(
+        shwfs.mla_grid,
+        shwfs.micro_lens_array.mla_index,
+        estimation_subapertures
+    )
+
+    # מחשבים מחדש את slopes_ref עם ה-estimator החדש
+    slopes_ref = shwfse.estimate([image_ref])
+
+    # ----------------------------- Interaction matrix --------------------------
+    response_matrix = []
+    probe_amp = 0.01 * wavelength_wfs
+
+    wf_calib = Wavefront(ap, wavelength_wfs)
+    wf_calib.total_power = 1.0
+
+    print("AO.py: Calibrating interaction matrix...")
+    for i in tqdm(range(num_modes)):
+        slope = 0
+        amps = [-probe_amp, probe_amp]
+
+        for amp in amps:
+            deformable_mirror.flatten()
+            deformable_mirror.actuators[i] = amp
+
+            dm_wf = deformable_mirror.forward(wf_calib)
+            wfs_wf = shwfs(magnifier(dm_wf))
+
+            camera.integrate(wfs_wf, 1.0)
+            image = camera.read_out()
+
+            slopes = shwfse.estimate([image])
+            slope += amp * slopes / np.var(amps)
+
+        response_matrix.append(slope.ravel())
+
+    response_matrix = ModeBasis(response_matrix)
+
+    # Reconstruction matrix (Tikhonov regularization)
+    rcond = 1e-3
+    reconstruction_matrix = inverse_tikhonov(
+        response_matrix.transformation_matrix,
+        rcond=rcond
+    )
+
+    print("AO.py: Interaction and reconstruction matrices ready.")
+
+    #-----------7.2 add Adaptive Optics both PSFs ----------
+    leakage = 0.01
+    num_iterations = 20
+    wf0_wfs = Wavefront(ap, wavelength_wfs)
+    delta_t = 0.001  # [s]
+    burn_in_iterations = 5
+    gain=0.3
+    leakage=0.01
+    coro = PerfectCoronagraph(ap, 4)
+    long_exposure = focal_grid.zeros()
+    long_exposure_coro = focal_grid.zeros()
+    for timestep in tqdm(range(num_iterations)):
+        layer.t = timestep * delta_t
+        # Propagate through atmosphere and deformable mirror.
+        wf_wfs_after_atmos = layer(wf0_wfs)
+        wf_wfs_after_dm = deformable_mirror(wf_wfs_after_atmos)
+
+        # Propagate through SH-WFS
+        wf_wfs_on_sh = shwfs(magnifier(wf_wfs_after_dm))
+
+        # Propagate the NIR wavefront
+        wf_sci_focal_plane = prop(deformable_mirror(layer(wf0)))
+        wf_sci_coro = prop(coro(deformable_mirror(layer(wf0))))
+
+        # Read out WFS camera
+        camera.integrate(wf_wfs_on_sh, delta_t)
+        wfs_image = camera.read_out()
+        wfs_image = large_poisson(wfs_image).astype('float')
+
+        # Accumulate long-exposure image
+        if timestep >= burn_in_iterations:
+            long_exposure += wf_sci_focal_plane.power / (num_iterations - burn_in_iterations)
+            long_exposure_coro += wf_sci_coro.power / (num_iterations - burn_in_iterations)
+
+        # Calculate slopes from WFS image
+        slopes = shwfse.estimate([wfs_image + 1e-10])
+        slopes -= slopes_ref
+        slopes = slopes.ravel()
+
+        # Perform wavefront control and set DM actuators
+        deformable_mirror.actuators = (1 - leakage) * deformable_mirror.actuators - gain * reconstruction_matrix.dot(slopes)
+
+    print("AO.py: Closed-loop AO finished.")
+    wf_wfs_after_dm_prop=prop(wf_wfs_after_dm)
+    print("after AO: ",np.sum(wf_wfs_after_dm_prop.power))
+    print(np.sum(wf_wfs_after_dm.power))
+    print("PSF1: ",np.sum(psf1))
+else:
+    wf_wfs_after_dm_prop=prop(wf1)
 # ---------- 8) Optional: overlay circle on both PSFs ----------
 if save_images:
     phase_screen = layer.phase_for(wavelength)          # Field on the pupil grid (radians)
@@ -174,7 +333,7 @@ if save_images:
     ymax_m = psf0.grid.y.max()*f_m
     extent_focal_mm = [xmin_m*scale_mm, xmax_m*scale_mm, ymin_m*scale_mm, ymax_m*scale_mm]
     # 1) Figure & axes
-    fig, axes = plt.subplots(2, 3, figsize=(14, 4.5), dpi=150)
+    fig, axes = plt.subplots(2, 4, figsize=(20, 4.5), dpi=150)
 
     # --- (a) Phase screen (pupil plane) ---
     utils.plot_phase_screen(fig,axes[0,0],phase_screen,extent_pupil_mm,title="A) Atmosphere Phase")
@@ -185,7 +344,9 @@ if save_images:
     # --- (c) Turbulent PSF ---
     utils.plot_phase_screen(fig,axes[0,2],phase1,extent_pupil_mm , title="D) Turbulent Phase (after)")
     utils.plot_psf_on(fig,axes[1,2], psf1,alpha,f_m,extent_focal_mm,scale_mm,title="D) Turbulent PSF (after)")
-    
+    # --- (d) AO-corrected PSF ---
+    utils.plot_phase_screen(fig,axes[0,3],wf_wfs_after_dm_prop.phase,extent_pupil_mm , title="AO correction (phase)")
+    utils.plot_psf_on(fig,axes[1,3], wf_wfs_after_dm_prop.power,alpha,f_m,extent_focal_mm,scale_mm,title="AO correction (psf)") 
     plt.tight_layout()
 
     # save or show (תמיד נשמור לאותה תיקייה כמו קודם)
