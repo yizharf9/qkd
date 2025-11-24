@@ -25,20 +25,31 @@ elif TurbulencLayer_prompt == "n" :
 else : 
     exit("not a valid input!")
 
+Noise_prompt = input("Add noise (y/n)? ")
+if Noise_prompt.lower() == "y":
+    Noise = True
+elif Noise_prompt.lower() == "n":
+    Noise = False
+else:
+    exit("Not a valid input! Please enter 'y' or 'n'.")
+
+
 code = open(path_file,"r", encoding="utf-8").read()
 code_obj = compile(code, "single_simulation.py", "exec")
 
 # r0 values
-num_of_r0_samples = 10
+num_of_r0_samples = 4
 start = 0.01
 end = 0.15
-r0_list = np.linspace(start=start,stop=end,num=num_of_r0_samples,)
-focal_dim=[8,1,1e-3,500e-6,9e-6]
+r0_list = np.linspace(start=start,stop=end,num=num_of_r0_samples)
+# r0_list = [0.075]
+focal_dim=[500e-6]
 # wavelength values
-wavelengths = [1.55e-6, 0.500e-6]
+# wavelengths = [1.55e-6, 0.500e-6]
+wavelengths = [1.55e-6]
 
 # num of runs for values specified values
-realizations_per_run = 5 
+realizations_per_run = 200 
 realizations_per_run_no_turb=4
 
 count = 1
@@ -53,8 +64,9 @@ for focal in focal_dim:
                         "__file__": str("single_simulation.py"),   # so Path(__file__) works inside turblance.py
                         "run_number": run_number,
                         "wavelength": wavelength,
-                        "r0_ref": r0_ref,  # example value for r0_ref
-                        "save_images": save_images,  # example value for r0_ref
+                        "r0_ref": r0_ref,  
+                        "save_images": save_images,  
+                        "Noise": Noise,  
                         "TurbulencLayer": TurbulencLayer,
                         "focal_dim": focal,
                     }
@@ -67,22 +79,24 @@ for focal in focal_dim:
                 print("Time asstimate to finish: "+str(int(T2FInish/60))+" minutes")
 
 print("run without TurbulencLayer")
-count = 1
-for focal in focal_dim:
-    for wavelength in wavelengths :
-        for r0_ref in r0_list :
-            for run_number in range(1,realizations_per_run_no_turb+1):  # example run number
-                ns = {
-                        "__name__": "__main__",
-                        "__file__": str("single_simulation.py"),   # so Path(__file__) works inside turblance.py
-                        "run_number": run_number,
-                        "wavelength": wavelength,
-                        "r0_ref": r0_ref,  # example value for r0_ref
-                        "save_images": save_images,  # example value for r0_ref
-                        "TurbulencLayer": False,
-                        "focal_dim":focal,
-                    }
-                number_of_runs=len(r0_list) * len(wavelengths) * realizations_per_run_no_turb *len(focal_dim)
-                print(f"\n=== run_number={count - 1} finished out of {number_of_runs } ({count/(number_of_runs) * 100:.3f}%) ===")
-                exec(code_obj, ns,ns)  # fresh globals per run (no locals dict)
-                count += 1
+if TurbulencLayer :
+    count = 1
+    for focal in focal_dim:
+        for wavelength in wavelengths :
+            for r0_ref in r0_list :
+                for run_number in range(1,realizations_per_run_no_turb+1):  # example run number
+                    ns = {
+                            "__name__": "__main__",
+                            "__file__": str("single_simulation.py"),   # so Path(__file__) works inside turblance.py
+                            "run_number": run_number,
+                            "wavelength": wavelength,
+                            "r0_ref": r0_ref,  
+                            "save_images": save_images,  
+                            "Noise": Noise,  
+                            "TurbulencLayer": False,
+                            "focal_dim":focal,
+                        }
+                    number_of_runs=len(r0_list) * len(wavelengths) * realizations_per_run_no_turb *len(focal_dim)
+                    print(f"\n=== run_number={count - 1} finished out of {number_of_runs } ({count/(number_of_runs) * 100:.3f}%) ===")
+                    exec(code_obj, ns,ns)  # fresh globals per run (no locals dict)
+                    count += 1

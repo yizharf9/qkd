@@ -79,7 +79,41 @@ def update_csv( wavelength,
         new_row_df.to_csv(file_path, mode='w', header=columns, index=False)
     print("Operation complete. Data has been saved.")
 
-# helper לציור phase_screen
+def add_noise_to_psf(
+        propagated_wavefront,
+        telescope_diameter,
+        SNR = 5,
+        stellar_magnitude = 8.0,
+        flux_zero_point = 1.5e10 ,
+        throughput = 0.8,
+        exposure_time = 0.01  ,
+    ):
+    focal_grid = propagated_wavefront.grid
+    collecting_area = np.pi * (telescope_diameter/2)**2
+
+    # Total photons/sec from the star entering the telescope
+    photon_flux = flux_zero_point * 10**(-0.4 * stellar_magnitude) * collecting_area * throughput
+
+    # Scale it to physical units (Photons / second)
+    image_photons_per_sec = propagated_wavefront.power * photon_flux * SNR
+
+    detector = NoisyDetector(focal_grid)
+
+    # Configure Noise Properties
+    detector.include_photon_noise = True
+    detector.read_noise = 5.0           # rms electrons
+    detector.dark_current_rate = 0.1     # electrons/sec/pixel (usually low for IR)
+    # detector.flat_field = 0.05         # Optional: 5% pixel-to-pixel sensitivity variation
+
+    detector.integrate(image_photons_per_sec, dt=exposure_time)
+
+    image_noisy = detector.read_out()
+
+    wf_noisy = Wavefront(image_noisy)
+    return wf_noisy
+
+
+
 def plot_phase_screen(fig,ax,phase_screen,extent_pupil_mm,mask=None,title="Turbulence phase screen [rad]"):
     # ax = axes[0]    
     # print(str(mask.shape) + "!!!!!")
@@ -98,7 +132,6 @@ def plot_phase_screen(fig,ax,phase_screen,extent_pupil_mm,mask=None,title="Turbu
     cb = fig.colorbar(im_phase_field, cax=cax)
     cb.set_label('Phase [rad]')
 
-# helper לציור PSF
 def plot_psf_on(fig,ax, psf,alpha,f_m,extent_focal_mm,scale_mm, title = "PSF plot"):
     psf_img = np.log10((psf / psf.max()).shaped + 1e-12)
     im = ax.imshow(psf_img, origin='lower', extent=extent_focal_mm,cmap='inferno', vmin=-6, vmax=0)
@@ -111,8 +144,6 @@ def plot_psf_on(fig,ax, psf,alpha,f_m,extent_focal_mm,scale_mm, title = "PSF plo
     cax = div.append_axes("right", size="5%", pad=0.06)
     cb = fig.colorbar(im, cax=cax)
     cb.set_label(r'$\log_{10}(\mathrm{Intensity}/\max)$')
-
-
 
 def animate_wavefronts(images_folder_dir,image_titles=None, interval=50, repeat_delay=1000):
     """Creates an animation from a list of Matplotlib image artists.
@@ -166,7 +197,7 @@ def animate_wavefronts(images_folder_dir,image_titles=None, interval=50, repeat_
 
     # Return the animation as an HTML5 video
     return HTML(anim.to_jshtml())
-#----------------methods for plot_and_graph------------------------
+
 def Load_csv(path_file):
     df = pd.read_csv(path_file)
     structure="-"*20+"structure"+20*"-"+"\n"
@@ -176,6 +207,7 @@ def Load_csv(path_file):
     structure=structure+"Columns:"+str(list(df.columns))+"\n"
     structure=structure+"-"*20+"structure"+20*"-"
     return [df,structure]
+
 def pick(colnames, *candidates):
     for c in candidates:
         if c in colnames:
@@ -185,7 +217,6 @@ def pick(colnames, *candidates):
             return hits[0]
     return None
 
-#----------------time asstimate------------------------
 def time_asstimate(current_time,begin_time,current_run,num_of_run): 
     """
     return the number in sec until the code is finish 

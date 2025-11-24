@@ -13,7 +13,7 @@ utils.check_dir()
 try:
     TurbulencLayer
 except NameError:
-    TurbulencLayer = True
+    TurbulencLayer = False
 try:
     run_number
 except NameError:
@@ -43,6 +43,18 @@ except NameError:
     else:
         exit("Not a valid input! Please enter 'y' or 'n'.")
 
+try:
+    Noise
+except NameError:
+    Noise_prompt = input("Add noise (y/n)? ")
+    if Noise_prompt.lower() == "y":
+        Noise = True
+    elif Noise_prompt.lower() == "n":
+        Noise = False
+    else:
+        exit("Not a valid input! Please enter 'y' or 'n'.")
+
+
 # ---------- 1) Pupil (VLT-like) ----------
 D = 8.0                 # [m]
 D_obs = 1.2             # [m]
@@ -57,7 +69,6 @@ ap_gen = make_obstructed_circular_aperture(D, eps, num_spiders=4, spider_width=s
 ap = evaluate_supersampled(ap_gen, pupil_grid, 4) 
 ref_wavelength=8e-7
 # ---------- 2) Wavelength & focal grid ----------
-# wavelength = 2.2e-6  # [m] science wavelength
 q = 8
 num_airy = 60
 spatial_res = wavelength / D  # [rad] per λ/D
@@ -74,13 +85,11 @@ psf0 = prop(wf0).power  # unaberrated PSF (relative units)
 phase0 = prop(wf0).phase  # unaberrated PSF (relative unitxs)
 
 # ---------- 4) Single-layer turbulence ----------
-seeing = 0.6       # [arcsec] @ 500 nm
 L0 = 40.0          # [m]
 tau0 = 5e-3        # [s]
 lam_ref = 500e-9   # [m]
 
 r0 = r0_ref * (wavelength / lam_ref) ** (6.0 / 5.0)    
-# r0 = seeing_to_fried_parameter(seeing)                # [m] at 500 nm
 Cn2 = Cn_squared_from_fried_parameter(r0, lam_ref)    # [m^(-2/3)]
 v = 0.314 * r0 / tau0                                     # [m/s] 
 
@@ -91,13 +100,21 @@ except TypeError:
     layer = InfiniteAtmosphericLayer(Cn2, L0, v)
 
 if TurbulencLayer is True:
-    wf1 = layer(wf0)      
-else:
     r0_ref=1
     wf1=wf0           # wavefront AFTER turbulence
-psf1 = prop(wf1).power           # instantaneous PSF with turbulence
-phase1 = prop(wf1).phase           # instantaneous PSF with turbulence
-Wf_in_focal=prop(wf1)
+else:
+    wf1 = layer(wf0)      
+
+if Noise is True:
+    Wf_in_focal=prop(wf1)
+    Wf_in_focal = utils.add_noise_to_psf(Wf_in_focal,D,SNR=5)
+    psf1 = Wf_in_focal.power
+    phase1 = Wf_in_focal.phase           # instantaneous PSF with turbulence
+else : 
+    psf1 = prop(wf1).power           # instantaneous PSF with turbulence
+    phase1 = prop(wf1).phase           # instantaneous PSF with turbulence
+    Wf_in_focal=prop(wf1)
+
 # ---------- 5) Bucket definition: 9 µm circle in focal plane ----------
 Fnum_sci = 50.0                 # adjust to your optics if needed 
 f_eff = Fnum_sci * D            # [m] effective focal length
