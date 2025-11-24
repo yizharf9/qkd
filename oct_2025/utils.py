@@ -80,7 +80,7 @@ def update_csv( wavelength,
         new_row_df.to_csv(file_path, mode='a', header=False, index=False)
     else:
         new_row_df.to_csv(file_path, mode='w', header=columns, index=False)
-    print("Operation complete. Data has been saved.")
+    print("Operation complete. Data has been saved\n.")
 
 # helper לציור phase_screen
 def plot_phase_screen(fig,ax,phase_screen,extent_pupil_mm,mask=None,title="Turbulence phase screen [rad]"):
@@ -295,6 +295,25 @@ def use_adaptive_optics(
     print(np.sum(wf_wfs_after_dm.power))
     print("PSF1: ",np.sum(psf1))
 
+def check_energy_conservation(
+    wf1,
+    Wf_in_focal
+    ):
+    print("\n-- Checking Energy conservation between pupil and focal --")
+    I_grid=np.abs(wf1.electric_field)**2
+    I_focal=np.abs(Wf_in_focal.electric_field)**2
+    weights_grid=wf1.grid.weights
+    print(weights_grid)
+    weights_focal=Wf_in_focal.grid.weights
+    print(weights_focal)
+    Wf_in_focal_power=np.sum(Wf_in_focal.power)
+    wf1_power=np.sum(wf1.power)
+    print("wf1 power: ",np.sum(Wf_in_focal.power))
+    print("focal power: ",np.sum(wf1.power))
+    Energy_conv=100*Wf_in_focal_power/wf1_power
+    print(f"Energy_conv [%]: {Energy_conv}")
+    return Energy_conv
+
 # helper לציור PSF
 def plot_psf_on(fig,ax, psf,alpha,f_m,extent_focal_mm,scale_mm, title = "PSF plot"):
     psf_img = np.log10((psf / psf.max()).shaped + 1e-12)
@@ -383,7 +402,7 @@ def pick(colnames, *candidates):
     return None
 
 #----------------time asstimate------------------------
-def time_asstimate(current_time,begin_time,current_run,num_of_run): 
+def time_estimate(current_time,begin_time,current_run,num_of_run): 
     """
     return the number in sec until the code is finish 
     assume linear progression 

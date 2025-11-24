@@ -1,17 +1,14 @@
-import os
 import utils
-from pathlib import Path
 import numpy as np
-import datetime as dt
 import time
-import math
-print(math.e)
 from params import massive_simulation_begin_massage 
 utils.check_dir()
 try:
     print(massive_simulation_begin_massage)
 except NameError:
-    print(2)
+    print("./params.py import executed incorrectly!")
+    exit()
+
 path_file="./single_simulation.py" #! <=== needs to be relative path to work
 # edit as needed
 save_images_prompt = input("save images (y/n) ?  ") #! <=== change to save photos in single turblance.py run 
@@ -66,7 +63,7 @@ for wavelength in wavelengths :
                 exec(code_obj, ns,ns)  # fresh globals per run (no locals dict)
                 current_time_for_run=time.time()
                 count += 1
-                T2FInish=utils.time_asstimate(current_time_for_run,time_for_start,count,number_of_runs)
+                T2FInish=utils.time_estimate(current_time_for_run,time_for_start,count,number_of_runs)
                 print("Time asstimate to finish: "+str(int(T2FInish/60))+" minutes")
 "run without TurbulencLayer"
 count = 1
