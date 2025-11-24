@@ -15,7 +15,7 @@ try:
     from hcipy import *
 except Exception as e:
     raise ImportError("HCIPy is required. Install it with: pip install hcipy") from e
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 import scipy.ndimage as ndimage
 
 def check_dir():
@@ -28,6 +28,24 @@ def check_dir():
         print(f"   Current directory is: '{current_directory_name}'")
         exit("Execution stopped. Please run the script from the 'oct_2025' directory.")
     print("-" * 60) # Visual separator
+
+def cli_tool():
+    save_images_prompt = input("save images (y/n) ?  ") #! <=== change to save photos in single turblance.py run 
+    if save_images_prompt == "y" :
+        save_images = True
+    elif save_images_prompt == "n" :
+        save_images = False
+    else : 
+        exit("not a valid input!")
+
+    TurbulencLayer_prompt = input("add layer with no turbulance (y/n) ?  ") #! <=== change to add layer without turb photos in single turblance.py run 
+    if TurbulencLayer_prompt == "y" :
+        TurbulencLayer = True
+    elif TurbulencLayer_prompt == "n" :
+        TurbulencLayer = False
+    else : 
+        exit("not a valid input!")
+    
 
 def update_csv( wavelength,
                 r0_ref_val,
@@ -294,6 +312,7 @@ def use_adaptive_optics(
     print("after AO: ",np.sum(wf_wfs_after_dm_prop.power))
     print(np.sum(wf_wfs_after_dm.power))
     print("PSF1: ",np.sum(psf1))
+    return wf_wfs_after_dm_prop
 
 def check_energy_conservation(
     wf1,
@@ -303,9 +322,9 @@ def check_energy_conservation(
     I_grid=np.abs(wf1.electric_field)**2
     I_focal=np.abs(Wf_in_focal.electric_field)**2
     weights_grid=wf1.grid.weights
-    print(weights_grid)
+    print("weights_grid: {weights_grid}")
     weights_focal=Wf_in_focal.grid.weights
-    print(weights_focal)
+    print("weights_focal: {weights_focal}")
     Wf_in_focal_power=np.sum(Wf_in_focal.power)
     wf1_power=np.sum(wf1.power)
     print("wf1 power: ",np.sum(Wf_in_focal.power))

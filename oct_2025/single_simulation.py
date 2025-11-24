@@ -33,9 +33,19 @@ try:
 except NameError:
     focal_dim=None
 try:
-    USE_OA
+    Run_test_batch
 except NameError:
-    USE_OA = False
+    Run_test_batch = False
+try:
+    USE_AO
+except NameError:
+    USE_AO_prompt = input("use adaptive optics (y/n) ?  ") 
+    if USE_AO_prompt == "y" :
+        USE_AO = True
+    elif USE_AO_prompt == "n" :
+        USE_AO = False
+    else : 
+        exit("not a valid input!")
 try:
     save_images
 except NameError:
@@ -104,6 +114,7 @@ frac1 = power1_in_bucket / power1_total
 # ---------- 7) Print results ----------
 #! all listed in the params file so no need to print really...
 #region : prints 
+print("\n-- current run params --")
 print(f"\nwavelength = {wavelength} , r0 = {r0_ref} ")
 # print("=== Bucket (9 µm diameter) @ focal plane ===")
 # print(f"F/# = {Fnum_sci:.1f},  f_eff = {f_eff:.3f} m")
@@ -123,8 +134,8 @@ Energy_conservation = utils.check_energy_conservation(wf1,Wf_in_focal)
 #endregion
 
 # ---------- 8) Implement Adaptive Optics ----------
-if USE_OA:
-    utils.use_adaptive_optics(
+if USE_AO:
+    wf_wfs_after_dm_prop = utils.use_adaptive_optics(
         initial_wavefront,
         psf1,
         pupil_grid,
@@ -173,7 +184,7 @@ if save_images:
     utils.plot_psf_on(fig,axes[1,3], wf_wfs_after_dm_prop.power,alpha,f_m,extent_focal_mm,scale_mm,title="AO correction (psf)") 
     plt.tight_layout()
 
-    # save or show (תמיד נשמור לאותה תיקייה כמו קודם)
+    # save or show 
     base_output_dir = 'simulation_output'
     os.makedirs(base_output_dir, exist_ok=True)
     out_path = os.path.join(
@@ -184,4 +195,5 @@ if save_images:
     print(f"✅ Saved combined figure to: {out_path}")
     plt.close(fig)
 
-utils.update_csv(wavelength, r0_ref, run_number,focal_dim,power0_in_bucket,power0_total,frac0,power1_in_bucket,power1_total,frac1,conservation_of_energy=Energy_conservation)
+if not Run_test_batch :
+    utils.update_csv(wavelength, r0_ref, run_number,focal_dim,power0_in_bucket,power0_total,frac0,power1_in_bucket,power1_total,frac1,conservation_of_energy=Energy_conservation)
