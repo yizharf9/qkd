@@ -80,7 +80,7 @@ def update_csv( wavelength,
         new_row_df.to_csv(file_path, mode='a', header=False, index=False)
     else:
         new_row_df.to_csv(file_path, mode='w', header=columns, index=False)
-    print("Operation complete. Data has been saved\n.")
+    print("Operation complete. Data has been saved.\n")
 
 # helper לציור phase_screen
 def plot_phase_screen(fig,ax,phase_screen,extent_pupil_mm,mask=None,title="Turbulence phase screen [rad]"):
