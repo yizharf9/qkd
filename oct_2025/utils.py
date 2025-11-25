@@ -118,39 +118,54 @@ def plot_phase_screen(fig,ax,phase_screen,extent_pupil_mm,mask=None,title="Turbu
     cax = div.append_axes("right", size="5%", pad=0.06)
     cb = fig.colorbar(im_phase_field, cax=cax)
     cb.set_label('Phase [rad]')
+import numpy as np
 
 def add_noise_to_wavefront(
         propagated_wavefront,
         telescope_diameter,
-        SNR = 5,
-        stellar_magnitude = 8.0,
-        flux_zero_point = 1.5e10 ,
-        throughput = 0.8,
-        exposure_time = 0.01  ,
+        stellar_magnitude=8.0,
+        flux_zero_point=1.5e10, # Photons/sec/m^2
+        throughput=0.8,
+        exposure_time=0.01,     # Seconds
+        read_noise=5.0,         # Moved to args for flexibility
+        dark_current=0.1        # Moved to args
     ):
+    """
+    Simulates detector noise (Photon shot noise + Read noise + Dark current).
+    Returns the detected image (electron counts), NOT a Wavefront.
+    """
     focal_grid = propagated_wavefront.grid
-    collecting_area = np.pi * (telescope_diameter/2)**2
+    collecting_area = np.pi * (telescope_diameter / 2)**2
 
-    # Total photons/sec from the star entering the telescope
-    photon_flux = flux_zero_point * 10**(-0.4 * stellar_magnitude) * collecting_area * throughput
+    # 1. Calculate Total Photons entering the telescope per second
+    # Flux ZP * 10^(-0.4*mag) gives flux per m^2
+    total_flux_in_aperture = (flux_zero_point * 10**(-0.4 * stellar_magnitude) * collecting_area * throughput)
 
-    # Scale it to physical units (Photons / second)
-    image_photons_per_sec = propagated_wavefront.power * photon_flux * SNR
+    # 2. Create the Normalized Intensity Distribution
+    # This ensures we distribute the total physical photons according to the wavefront shape
+    intensity_distribution = propagated_wavefront.power
+    if propagated_wavefront.total_power > 0:
+        intensity_distribution /= propagated_wavefront.total_power
+    
+    # 3. Scale to Physical Photon Rate (Photons / sec / pixel)
+    image_photons_per_sec = intensity_distribution * total_flux_in_aperture
 
+    # 4. Detector Simulation
+    # Assuming 'NoisyDetector' is a class from a library like HCIPy
     detector = NoisyDetector(focal_grid)
 
-    # Configure Noise Properties
     detector.include_photon_noise = True
-    detector.read_noise = 5.0           # rms electrons
-    detector.dark_current_rate = 0.1     # electrons/sec/pixel (usually low for IR)
-    # detector.flat_field = 0.05         # Optional: 5% pixel-to-pixel sensitivity variation
+    detector.read_noise = read_noise            
+    detector.dark_current_rate = dark_current   
 
+    # Integrate accumulates photons over time -> converts to electrons
     detector.integrate(image_photons_per_sec, dt=exposure_time)
 
+    # Read out adds read noise and discretizes
     image_noisy = detector.read_out()
 
-    wf_noisy = Wavefront(image_noisy)
-    return wf_noisy
+    # Return the image array (Intensity), not a Wavefront (Field)
+    return image_noisy
 
 def use_adaptive_optics(
     wf0,

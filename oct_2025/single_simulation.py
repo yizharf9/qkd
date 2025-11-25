@@ -37,6 +37,16 @@ try:
 except NameError:
     Run_test_batch = False
 try:
+    Add_Stellar_Noise
+except NameError:
+    Add_Stellar_Noise_prompt = input("add stellar noise (y/n) ?  ") 
+    if Add_Stellar_Noise_prompt == "y" :
+        Add_Stellar_Noise = True
+    elif Add_Stellar_Noise_prompt == "n" :
+        Add_Stellar_Noise = False
+    else : 
+        exit("not a valid input!")
+try:
     USE_AO
 except NameError:
     USE_AO_prompt = input("use adaptive optics (y/n) ?  ") 
@@ -92,6 +102,7 @@ if TurbulencLayer is True:
 else:
     r0_ref=1
     wf1=initial_wavefront           # wavefront AFTER turbulence
+
 psf1 = propagator(wf1).power           # instantaneous PSF with turbulence
 phase1 = propagator(wf1).phase           # instantaneous PSF with turbulence
 Wf_in_focal=propagator(wf1)
@@ -107,9 +118,21 @@ power0_in_bucket = np.sum(initial_psf * bucket_mask * w)
 power0_total     = np.sum(initial_psf * w)
 frac0 = power0_in_bucket / power0_total
 
-power1_in_bucket = np.sum(psf1 * bucket_mask * w)
-power1_total     = np.sum(psf1 * w)
-frac1 = power1_in_bucket / power1_total
+if Add_Stellar_Noise :
+    noisy_psf1 = abs(utils.add_noise_to_wavefront(Wf_in_focal, D,stellar_magnitude=12))**2
+    # ---------- 6) Proper integration with grid weights (HCIPy 0.7.0) ----------
+    # w = focal_grid.weights 
+    w = 1
+    
+    psf1 = noisy_psf1
+    
+    power1_in_bucket = np.sum(noisy_psf1 * bucket_mask * w)
+    power1_total     = np.sum(noisy_psf1 * w)
+    frac1 = power1_in_bucket / power1_total
+else :
+    power1_in_bucket = np.sum(psf1 * bucket_mask * w)
+    power1_total     = np.sum(psf1 * w)
+    frac1 = power1_in_bucket / power1_total
 
 # ---------- 7) Print results ----------
 #! all listed in the params file so no need to print really...

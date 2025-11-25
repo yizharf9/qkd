@@ -36,6 +36,15 @@ elif TurbulencLayer_prompt == "n" :
 else : 
     exit("not a valid input!")
 
+
+Add_Stellar_Noise_prompt = input("add stellar noise (y/n) ?  ") 
+if Add_Stellar_Noise_prompt == "y" :
+    Add_Stellar_Noise = True
+elif Add_Stellar_Noise_prompt == "n" :
+    Add_Stellar_Noise = False
+else : 
+    exit("not a valid input!")
+
 USE_AO_prompt = input("use adaptive optics (y/n) ?  ") 
 if USE_AO_prompt == "y" :
     USE_AO = True
@@ -85,6 +94,7 @@ for wavelength in wavelengths :
                         "r0_ref": r0_ref,  # example value for r0_ref
                         "save_images": save_images,  # example value for r0_ref
                         "TurbulencLayer": TurbulencLayer,
+                        "Add_Stellar_Noise": Add_Stellar_Noise,
                         "USE_AO": USE_AO,
                         "Run_test_batch": Run_test_batch,
                     }
@@ -110,6 +120,7 @@ for focal in focal_dim:
                         "r0_ref": r0_ref,  # example value for r0_ref
                         "save_images": save_images,  # example value for r0_ref
                         "TurbulencLayer": False,
+                        "Add_Stellar_Noise": Add_Stellar_Noise,
                         "USE_AO": USE_AO,
                         "Run_test_batch": Run_test_batch,
                         "focal_dim":focal,
