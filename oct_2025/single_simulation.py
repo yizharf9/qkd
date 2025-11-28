@@ -9,6 +9,9 @@ except Exception as e:
     raise ImportError("HCIPy is required. Install it with: pip install hcipy") from e
 import params
 import pandas as pd
+from scipy.ndimage import sum as scipy_sum
+from tqdm.notebook import tqdm
+
 # ----------------------------- Directory Check -----------------------------
 utils.check_dir()
 # ----------------------------- Parameters -----------------------------
@@ -76,10 +79,8 @@ except NameError:
 import warnings
 warnings.filterwarnings("ignore", module="hcipy")
 # ---------- 1) Pupil (VLT-like) ----------
-pupil_grid = make_pupil_grid(N, D * oversz)
 
-aperture_generator = make_obstructed_circular_aperture(D, eps, num_spiders=4, spider_width=spider_w)
-aperture = evaluate_supersampled(aperture_generator, pupil_grid, 4) 
+
 
 # ---------- 1) Pupil (VLT-like) ---------- 
 D = 0.3                # [m]
@@ -92,6 +93,8 @@ N=240
 pupil_grid = make_pupil_grid(N*oversz, D * oversz)
 ap_gen = make_obstructed_circular_aperture(D, eps, num_spiders=4, spider_width=spider_w)
 ap = evaluate_supersampled(ap_gen, pupil_grid, 4) 
+aperture_generator = ap_gen
+aperture = ap
 # ---------- 2) Wavelength & focal grid ----------
 # wavelength = 2.2e-6  # [m] science wavelength
 q = 4
@@ -113,8 +116,6 @@ phase0 = prop.forward(wf0).phase  # unaberrated PSF (relative unitxs)
                                     # [m/s] 
 
 # HCIPy 0.7.0 API fallback
-
-
 if TurbulencLayer is True:
     L0 = 40.0          # [m]
     tau0 = 5e-3        # [s]
@@ -204,7 +205,7 @@ if USE_OA:
     camera = NoiselessDetector(focal_grid)
     camera.integrate(shwfs(magnifier(wf0)), 1)
     image_ref = camera.read_out()
-    fluxes = ndimage.measurements.sum(image_ref, shwfse.mla_index, shwfse.estimation_subapertures)
+    fluxes = scipy_sum(image_ref, shwfse.mla_index, shwfse.estimation_subapertures)
     flux_limit = fluxes.max() * 0.5
 
     estimation_subapertures = shwfs.mla_grid.zeros(dtype='bool')
@@ -287,7 +288,7 @@ if USE_OA:
             wf_wfs_on_sh = shwfs(magnifier(wf_wfs_after_dm))
             wf_wfs_on_sh_non_magnifier=shwfs(wf_wfs_after_dm)
             # Propagate the NIR wavefront
-            wf_sci_focal_plane = propagator(deformable_mirror(layer(wf_wfs)))
+            wf_focal_plane = propagator(deformable_mirror(layer(wf_wfs)))
             wf_sci_coro = propagator(coro(deformable_mirror(layer(wf_wfs))))
 
             # Read out WFS camera
@@ -297,7 +298,7 @@ if USE_OA:
 
             # Accumulate long-exposure image
             if timestep >= burn_in_iterations:
-                long_exposure += wf_sci_focal_plane.power / (num_iterations - burn_in_iterations)
+                long_exposure += wf_focal_plane.power / (num_iterations - burn_in_iterations)
                 long_exposure_coro += wf_sci_coro.power / (num_iterations - burn_in_iterations)
 
             # Calculate slopes from WFS image
@@ -311,7 +312,7 @@ if USE_OA:
             # Plotting
             if timestep % 20 == 0:
                 E_power = float(np.sum(propagator(wf_wfs_after_atmos).power))
-                D_power = float(np.sum(wf_sci_focal_plane.power))
+                D_power = float(np.sum(wf_focal_plane.power))
 
                 log_rows.append({
                     "timestep": timestep,
@@ -320,58 +321,68 @@ if USE_OA:
                     "num_airy":num_airy,
                     "r0_ref":fried_parameter,
                 })
-                plt.clf()
-                plt.suptitle('Timestep %d / %d' % (timestep, num_iterations))
+        if save_images:
+            FIG_OA=plt.clf()
+            plt.suptitle('Timestep %d / %d' % (timestep, num_iterations))
 
-                plt.subplot(3,2,1)
-                plt.title("psf at the entry [c]")
-                imshow_field(wf_wfs_after_atmos.phase, cmap='inferno')
-                plt.xlabel('[M]')
-                plt.ylabel('[M]')
-                cb1=plt.colorbar()
-                cb1.set_label("[rad]")
+            plt.subplot(3,2,1)
+            plt.title("psf at the entry [c]")
+            imshow_field(wf_wfs_after_atmos.phase, cmap='inferno')
+            plt.xlabel('[M]')
+            plt.ylabel('[M]')
+            cb1=plt.colorbar()
+            cb1.set_label("[rad]")
 
-                plt.subplot(3,2,2)
-                plt.title('WFS at camera [counts][E]')
-                imshow_field(np.log10(propagator(wf_wfs_after_atmos).power/propagator(wf_wfs_after_atmos).power.max()),cmap="inferno")
-                plt.xlabel('[M]')
-                plt.ylabel('[M]')
-                cb2=plt.colorbar()
-                cb2.set_label("[W]")
+            plt.subplot(3,2,2)
+            plt.title('WFS at camera [counts][E]')
+            imshow_field(np.log10(propagator(wf_wfs_after_atmos).power/propagator(wf_wfs_after_atmos).power.max()),cmap="inferno")
+            plt.xlabel('[M]')
+            plt.ylabel('[M]')
+            cb2=plt.colorbar()
+            cb2.set_label("[W]")
 
-                plt.subplot(3,2,3)
-                plt.title('DM surface [$\\mu$m]-[H]')
-                imshow_field(deformable_mirror.surface * 1e6, cmap='RdBu', vmin=-2, vmax=2, mask=ap)
-                plt.xlabel('[M]')
-                plt.ylabel('[M]')
-                cb3=plt.colorbar()
-                cb3.set_label("[rad]")
+            plt.subplot(3,2,3)
+            plt.title('DM surface [$\\mu$m]-[H]')
+            imshow_field(deformable_mirror.surface * 1e6, cmap='RdBu', vmin=-2, vmax=2, mask=ap)
+            plt.xlabel('[M]')
+            plt.ylabel('[M]')
+            cb3=plt.colorbar()
+            cb3.set_label("[rad]")
 
-                plt.subplot(3,2,4)
-                plt.title(' PSF at Shack-Hartmann [F]')
-                imshow_field(wfs_image,cmap='inferno')
-                plt.xlabel('[M]')
-                plt.ylabel('[M]')
-                cb4=plt.colorbar()
-                cb4.set_label("[W]")
+            plt.subplot(3,2,4)
+            plt.title(' PSF at Shack-Hartmann [F]')
+            imshow_field(wfs_image,cmap='inferno')
+            plt.xlabel('[M]')
+            plt.ylabel('[M]')
+            cb4=plt.colorbar()
+            cb4.set_label("[W]")
 
-                plt.subplot(3,2,5)
-                plt.title(' PSF at focal [D]')
-                imshow_field(np.log10(wf_sci_focal_plane.power / wf_sci_focal_plane.power.max()), vmin=-6, vmax=0, cmap='inferno')
-                plt.xlabel('[M]')
-                plt.ylabel('[M]')
-                cb5=plt.colorbar()
-                cb5.set_label("[W]")
+            plt.subplot(3,2,5)
+            plt.title(' PSF at focal [D]')
+            imshow_field(np.log10(wf_focal_plane.power / wf_focal_plane.power.max()), vmin=-6, vmax=0, cmap='inferno')
+            plt.xlabel('[M]')
+            plt.ylabel('[M]')
+            cb5=plt.colorbar()
+            cb5.set_label("[W]")
 
 
-                plt.tight_layout()
-                anim.add_frame()
+            plt.tight_layout()
+            base_output_dir = 'simulation_output'
+            os.makedirs(base_output_dir, exist_ok=True)
+            out_path = os.path.join(
+            base_output_dir,
+            f"OA_{wavelength*1e6:.2f}um_r0ref_{fried_parameter*1e3:.1f}mm_run_{run_number}num_airy{num_airy}.png"
+            )
+            plt.savefig(out_path, dpi=300, bbox_inches="tight")
+            print(f"✅ Saved combined figure to: {out_path}")
+        
 
         plt.close()
         anim.close()
 
+
         # Show created animation
-    if save_images==True
+    if save_images==True:
 
         plt.clf
         plt.suptitle('Timestep %d / %d' % (timestep, num_iterations))
@@ -410,7 +421,7 @@ if USE_OA:
 
         plt.subplot(3,2,5)
         plt.title(' PSF at focal [D]')
-        imshow_field(np.log10(wf_sci_focal_plane.power / wf_sci_focal_plane.power.max()), vmin=-6, vmax=0, cmap='inferno')
+        imshow_field(np.log10(wf_focal_plane.power / wf_focal_plane.power.max()), vmin=-6, vmax=0, cmap='inferno')
         plt.xlabel('[M]')
         plt.ylabel('[M]')
         cb5=plt.colorbar()
@@ -441,12 +452,13 @@ if USE_OA:
 
     df_all.to_csv(output_path, index=False)
     print("Appended log to AO_simulation_log.csv")
-    OA_power=float(np.sum(wf_sci_focal_plane.power))/norm
+    OA_power=float(np.sum(wf_focal_plane.power))/norm
 else:
-    OA_power=prop(wf1).power
-print(OA_power)
+    wf_focal_plane=prop(wf1)
+    OA_power=0000000.00000
 # ---------- 8) Optional: overlay circle on both PSFs ----------
 if save_images:
+    initial_psf=wf0.power
     phase_screen = layer.phase_for(wavelength)          # Field on the pupil grid (radians)
     power_screen = np.abs(np.exp(1j*phase_screen))**2          #! to be changed to psf
 
@@ -477,8 +489,8 @@ if save_images:
     utils.plot_phase_screen(fig,axes[0,2],phase1,extent_pupil_mm , title="D) Turbulent Phase (after)")
     utils.plot_psf_on(fig,axes[1,2], psf1,alpha,f_m,extent_focal_mm,scale_mm,title="D) Turbulent PSF (after)",log_scale=True)
     # --- (d) AO-corrected PSF ---
-    utils.plot_phase_screen(fig,axes[0,3],prop(wf_after_dm).phase,extent_pupil_mm , title="AO correction (phase)")
-    utils.plot_psf_on(fig,axes[1,3],prop(wf_after_dm).power,alpha,f_m,extent_focal_mm,scale_mm,title="AO correction (psf)",log_scale=True) 
+    utils.plot_phase_screen(fig,axes[0,3],wf_focal_plane.phase,extent_pupil_mm , title="AO correction (phase)")
+    utils.plot_psf_on(fig,axes[1,3],wf_focal_plane.power,alpha,f_m,extent_focal_mm,scale_mm,title="AO correction (psf)",log_scale=True) 
     plt.tight_layout()
 
     # save or show 
@@ -493,4 +505,5 @@ if save_images:
     plt.close(fig)
 
 if not Run_test_batch :
-    utils.update_csv(wavelength, r0_ref, run_number,focal_dim,power0_in_bucket,power0_total,frac0,power1_in_bucket,power1_total,frac1,conservation_of_energy=Energy_conservation)
+    """( wavelength,r0_ref_val,run_num,power_in_bucket_before,total_power_before,precentage_before,total_power_after,precentage_after,conservation_of_energy,num_airy,power_after_OA=None,power_in_bucket_after=1111111):"""
+    utils.update_csv(wavelength=wavelength, r0_ref_val=r0_ref, run_num=run_number,power_in_bucket_before=power0_in_bucket,total_power_before=power0_total,precentage_before=frac0,total_power_after=power1_in_bucket,precentage_after=frac1,conservation_of_energy=Energy_conservation,num_airy=num_airy,power_after_OA=OA_power,power_in_bucket_after=power1_total)

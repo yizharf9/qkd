@@ -16,7 +16,6 @@ try:
 except Exception as e:
     raise ImportError("HCIPy is required. Install it with: pip install hcipy") from e
 from tqdm import tqdm
-import scipy.ndimage as ndimage
 
 def check_dir():
     print("Checking current working directory...")

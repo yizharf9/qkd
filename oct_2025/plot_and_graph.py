@@ -19,15 +19,12 @@ def check_axis(run_Cn2: bool,r0_col) -> str:
         r0_col=r0_col
     return r0_col
     
-import pandas as pd
-import matplotlib.pyplot as plt
-
 df=pd.read_csv(path_file)
 df1=df[1:91]
 print(len(df1))
 def plot_E_and_D():
         # --- Load data ---
-    df = pd.read_csv("AO_simulation_log.csv")
+    df = pd.read_csv("./AO_simulation_log.csv")
     norm=params.norm
     # --- Columns ---
     t_col   = "timestep"
