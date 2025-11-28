@@ -2,10 +2,11 @@ import os
 import itertools
 import numpy as np
 import pandas as pd
-from matplotlib.ticker import LogLocator, NullFormatter, ScalarFormatter
 import datetime
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+from matplotlib.lines import Line2D
+from matplotlib.ticker import LogLocator, NullFormatter, ScalarFormatter
 from matplotlib import animation
 from IPython.display import HTML
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -14,7 +15,9 @@ try:
     from hcipy import *
 except Exception as e:
     raise ImportError("HCIPy is required. Install it with: pip install hcipy") from e
-import time
+from tqdm import tqdm
+import scipy.ndimage as ndimage
+
 def check_dir():
     print("Checking current working directory...")
     current_directory_name = os.path.basename(os.getcwd())
@@ -25,6 +28,24 @@ def check_dir():
         print(f"   Current directory is: '{current_directory_name}'")
         exit("Execution stopped. Please run the script from the 'oct_2025' directory.")
     print("-" * 60) # Visual separator
+
+def cli_tool():
+    save_images_prompt = input("save images (y/n) ?  ") #! <=== change to save photos in single turblance.py run 
+    if save_images_prompt == "y" :
+        save_images = True
+    elif save_images_prompt == "n" :
+        save_images = False
+    else : 
+        exit("not a valid input!")
+
+    TurbulencLayer_prompt = input("add layer with no turbulance (y/n) ?  ") #! <=== change to add layer without turb photos in single turblance.py run 
+    if TurbulencLayer_prompt == "y" :
+        TurbulencLayer = True
+    elif TurbulencLayer_prompt == "n" :
+        TurbulencLayer = False
+    else : 
+        exit("not a valid input!")
+    
 
 def update_csv( wavelength,
                 r0_ref_val,
@@ -79,7 +100,7 @@ def update_csv( wavelength,
         new_row_df.to_csv(file_path, mode='a', header=False, index=False)
     else:
         new_row_df.to_csv(file_path, mode='w', header=columns, index=False)
-    print("Operation complete. Data has been saved.")
+    print("Operation complete. Data has been saved.\n")
 
 # helper לציור phase_screen
 def plot_phase_screen(fig,ax,phase_screen,extent_pupil_mm,mask=None,title="Turbulence phase screen [rad]"):
@@ -99,6 +120,235 @@ def plot_phase_screen(fig,ax,phase_screen,extent_pupil_mm,mask=None,title="Turbu
     cax = div.append_axes("right", size="5%", pad=0.06)
     cb = fig.colorbar(im_phase_field, cax=cax)
     cb.set_label('Phase [rad]')
+import numpy as np
+
+def add_noise_to_wavefront(
+        propagated_wavefront,
+        telescope_diameter,
+        stellar_magnitude=8.0,
+        flux_zero_point=1.5e10, # Photons/sec/m^2
+        throughput=0.8,
+        exposure_time=0.01,     # Seconds
+        read_noise=5.0,         # Moved to args for flexibility
+        dark_current=0.1        # Moved to args
+    ):
+    """
+    Simulates detector noise (Photon shot noise + Read noise + Dark current).
+    Returns the detected image (electron counts), NOT a Wavefront.
+    """
+    focal_grid = propagated_wavefront.grid
+    collecting_area = np.pi * (telescope_diameter / 2)**2
+
+    # 1. Calculate Total Photons entering the telescope per second
+    # Flux ZP * 10^(-0.4*mag) gives flux per m^2
+    total_flux_in_aperture = (flux_zero_point * 10**(-0.4 * stellar_magnitude) * collecting_area * throughput)
+
+    # 2. Create the Normalized Intensity Distribution
+    # This ensures we distribute the total physical photons according to the wavefront shape
+    intensity_distribution = propagated_wavefront.power
+    if propagated_wavefront.total_power > 0:
+        intensity_distribution /= propagated_wavefront.total_power
+    
+    # 3. Scale to Physical Photon Rate (Photons / sec / pixel)
+    image_photons_per_sec = intensity_distribution * total_flux_in_aperture
+
+    # 4. Detector Simulation
+    # Assuming 'NoisyDetector' is a class from a library like HCIPy
+    detector = NoisyDetector(focal_grid)
+
+    detector.include_photon_noise = True
+    detector.read_noise = read_noise            
+    detector.dark_current_rate = dark_current   
+
+    # Integrate accumulates photons over time -> converts to electrons
+    detector.integrate(image_photons_per_sec, dt=exposure_time)
+
+    # Read out adds read noise and discretizes
+    image_noisy = detector.read_out()
+
+    # Return the image array (Intensity), not a Wavefront (Field)
+    return image_noisy
+
+def use_adaptive_optics(
+    wf0,
+    psf1,
+    pupil_grid,
+    focal_grid,
+    layer,
+    prop,
+    D,
+    ap,
+):
+    wavelength_wfs=8e-7
+    num_modes = 30
+    num_modes = 30
+    dm_modes = make_disk_harmonic_basis(
+        pupil_grid, num_modes, D, 'neumann'
+    )
+    dm_modes = ModeBasis(
+        [mode / np.ptp(mode) for mode in dm_modes], pupil_grid
+    )
+    deformable_mirror = DeformableMirror(dm_modes)
+    deformable_mirror.flatten
+    response_matrix = []
+    probe_amp = 0.01 * wavelength_wfs
+
+    wf_calib = Wavefront(ap, wavelength_wfs)
+    wf_calib.total_power = 1.0
+    #---------SH WFS Setup-----------
+    f_number = 50
+    num_lenslets = 40
+    sh_diameter = 5e-3  # [m] SH beam diameter
+
+    magnification = sh_diameter / D
+    magnifier = Magnifier(magnification)
+    shwfs = SquareShackHartmannWavefrontSensorOptics(
+        pupil_grid.scaled(magnification),
+        f_number,
+        num_lenslets,
+        sh_diameter
+    )
+    spatial_resolution_wfs = wavelength_wfs / D      # [rad] per λ/D (roughly)
+    focal_grid_wfs = make_focal_grid(
+        q=4,
+        num_airy=2,             # enough to capture each SH spot
+        spatial_resolution=spatial_resolution_wfs,
+        pupil_diameter=D,
+        focal_length=None
+    )
+    shwfse = ShackHartmannWavefrontSensorEstimator(
+        shwfs.mla_grid,
+        shwfs.micro_lens_array.mla_index
+    )
+    wf_ref_wfs = Wavefront(ap, wavelength_wfs)
+    camera = NoiselessDetector(focal_grid_wfs)
+    camera.integrate(shwfs(magnifier(wf_ref_wfs)), 1.0)
+    image_ref = camera.read_out()
+    slopes_ref = shwfse.estimate([image_ref])
+    # ---- Select estimation subapertures based on flux ----
+    fluxes = ndimage.sum(image_ref, shwfse.mla_index, shwfse.estimation_subapertures)
+    flux_limit = fluxes.max() * 0.5  # לדוגמה – 50% מהפלוקס המקסימלי
+
+    estimation_subapertures = shwfs.mla_grid.zeros(dtype='bool')
+    estimation_subapertures[
+        shwfse.estimation_subapertures[fluxes > flux_limit]
+    ] = True
+
+    # בונים מחדש את ה-estimator עם רק הסאב־אפרצ’רים הטובים
+    shwfse = ShackHartmannWavefrontSensorEstimator(
+        shwfs.mla_grid,
+        shwfs.micro_lens_array.mla_index,
+        estimation_subapertures
+    )
+
+    # מחשבים מחדש את slopes_ref עם ה-estimator החדש
+    slopes_ref = shwfse.estimate([image_ref])
+
+    # ----------------------------- Interaction matrix --------------------------
+    response_matrix = []
+    probe_amp = 0.01 * wavelength_wfs
+
+    wf_calib = Wavefront(ap, wavelength_wfs)
+    wf_calib.total_power = 1.0
+
+    print("AO.py: Calibrating interaction matrix...")
+    for i in tqdm(range(num_modes)):
+        slope = 0
+        amps = [-probe_amp, probe_amp]
+
+        for amp in amps:
+            deformable_mirror.flatten()
+            deformable_mirror.actuators[i] = amp
+
+            dm_wf = deformable_mirror.forward(wf_calib)
+            wfs_wf = shwfs(magnifier(dm_wf))
+
+            camera.integrate(wfs_wf, 1.0)
+            image = camera.read_out()
+
+            slopes = shwfse.estimate([image])
+            slope += amp * slopes / np.var(amps)
+
+        response_matrix.append(slope.ravel())
+
+    response_matrix = ModeBasis(response_matrix)
+
+    # Reconstruction matrix (Tikhonov regularization)
+    rcond = 1e-3
+    reconstruction_matrix = inverse_tikhonov(
+        response_matrix.transformation_matrix,
+        rcond=rcond
+    )
+
+    print("AO.py: Interaction and reconstruction matrices ready.")
+
+    #-----------7.2 add Adaptive Optics both PSFs ----------
+    leakage = 0.01
+    num_iterations = 20
+    wf0_wfs = Wavefront(ap, wavelength_wfs)
+    delta_t = 0.001  # [s]
+    burn_in_iterations = 5
+    gain=0.3
+    leakage=0.01
+    coro = PerfectCoronagraph(ap, 4)
+    long_exposure = focal_grid.zeros()
+    long_exposure_coro = focal_grid.zeros()
+    for timestep in tqdm(range(num_iterations)):
+        layer.t = timestep * delta_t
+        # Propagate through atmosphere and deformable mirror.
+        wf_wfs_after_atmos = layer(wf0_wfs)
+        wf_wfs_after_dm = deformable_mirror(wf_wfs_after_atmos)
+
+        # Propagate through SH-WFS
+        wf_wfs_on_sh = shwfs(magnifier(wf_wfs_after_dm))
+
+        # Propagate the NIR wavefront
+        wf_sci_focal_plane = prop(deformable_mirror(layer(wf0)))
+        wf_sci_coro = prop(coro(deformable_mirror(layer(wf0))))
+
+        # Read out WFS camera
+        camera.integrate(wf_wfs_on_sh, delta_t)
+        wfs_image = camera.read_out()
+        wfs_image = large_poisson(wfs_image).astype('float')
+
+        # Accumulate long-exposure image
+        if timestep >= burn_in_iterations:
+            long_exposure += wf_sci_focal_plane.power / (num_iterations - burn_in_iterations)
+            long_exposure_coro += wf_sci_coro.power / (num_iterations - burn_in_iterations)
+
+        # Calculate slopes from WFS image
+        slopes = shwfse.estimate([wfs_image + 1e-10])
+        slopes -= slopes_ref
+        slopes = slopes.ravel()
+
+        # Perform wavefront control and set DM actuators
+        deformable_mirror.actuators = (1 - leakage) * deformable_mirror.actuators - gain * reconstruction_matrix.dot(slopes)
+
+    print("AO.py: Closed-loop AO finished.")
+    wf_wfs_after_dm_prop=prop(wf_wfs_after_dm)
+    print("after AO: ",np.sum(wf_wfs_after_dm_prop.power))
+    print(np.sum(wf_wfs_after_dm.power))
+    print("PSF1: ",np.sum(psf1))
+    return wf_wfs_after_dm_prop
+
+def check_energy_conservation(
+    wf1,
+    Wf_in_focal
+    ):
+    print("\n-- Checking Energy conservation between pupil and focal --")
+    I_grid=np.abs(wf1.electric_field)**2
+    I_focal=np.abs(Wf_in_focal.electric_field)**2
+    weights_grid=wf1.grid.weights
+    print("weights_grid: {weights_grid}")
+    weights_focal=Wf_in_focal.grid.weights
+    print("weights_focal: {weights_focal}")
+    Wf_in_focal_power=np.sum(Wf_in_focal.power)
+    wf1_power=np.sum(wf1.power)
+    print("wf1 power: ",np.sum(Wf_in_focal.power))
+    print("focal power: ",np.sum(wf1.power))
+    Energy_conv=100*Wf_in_focal_power/wf1_power
+    print(f"Energy_conv [%]: {Energy_conv}")
+    return Energy_conv
 
 # helper לציור PSF
 def plot_psf_on(fig,ax, psf,alpha,f_m,extent_focal_mm,scale_mm, title = "PSF plot",log_scale=True):
@@ -191,7 +441,7 @@ def pick(colnames, *candidates):
     return None
 
 #----------------time asstimate------------------------
-def time_asstimate(current_time,begin_time,current_run,num_of_run): 
+def time_estimate(current_time,begin_time,current_run,num_of_run): 
     """
     return the number in sec until the code is finish 
     assume linear progression 
@@ -200,10 +450,7 @@ def time_asstimate(current_time,begin_time,current_run,num_of_run):
     avg_TFR=runtime/current_run #avg time for run
     return avg_TFR*num_of_run-runtime
 #-----plots----------
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
+
 
 def plot_mean_line_loglin(
     df: pd.DataFrame,
@@ -260,8 +507,8 @@ def plot_mean_line_loglin(
 
     # --- aggregation: mean of y per (wl, focal, x) ---
     g = (work
-         .groupby([wl_col, focal_col, x_col], as_index=False)[y_col]
-         .mean()
+        .groupby([wl_col, focal_col, x_col], as_index=False)[y_col]
+        .mean()
         )
 
     # --- required x values check ---

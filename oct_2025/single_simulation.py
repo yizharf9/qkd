@@ -1,4 +1,5 @@
 import os
+from params import *
 import utils
 import numpy as np
 import matplotlib.pyplot as plt
@@ -6,8 +7,6 @@ try:
     from hcipy import *
 except Exception as e:
     raise ImportError("HCIPy is required. Install it with: pip install hcipy") from e
-from tqdm.notebook import tqdm
-import scipy.ndimage as ndimage
 import params
 import pandas as pd
 # ----------------------------- Directory Check -----------------------------
@@ -40,7 +39,21 @@ try:
 except NameError:
     focal_dim=None
 try:
-    USE_OA
+    Run_test_batch
+except NameError:
+    Run_test_batch = False
+try:
+    Add_Stellar_Noise
+except NameError:
+    Add_Stellar_Noise_prompt = input("add stellar noise (y/n) ?  ") 
+    if Add_Stellar_Noise_prompt == "y" :
+        Add_Stellar_Noise = True
+    elif Add_Stellar_Noise_prompt == "n" :
+        Add_Stellar_Noise = False
+    else : 
+        exit("not a valid input!")
+try:
+    USE_AO
 except NameError:
     USE_OA = True
 try:
@@ -58,6 +71,15 @@ except NameError:
         save_images = False
     else:
         exit("Not a valid input! Please enter 'y' or 'n'.")
+
+# ---------- ignore runtime warning (num_additions = 2 * num_complex_multiplications + 2 * num_complex_additions ...) ----------
+import warnings
+warnings.filterwarnings("ignore", module="hcipy")
+# ---------- 1) Pupil (VLT-like) ----------
+pupil_grid = make_pupil_grid(N, D * oversz)
+
+aperture_generator = make_obstructed_circular_aperture(D, eps, num_spiders=4, spider_width=spider_w)
+aperture = evaluate_supersampled(aperture_generator, pupil_grid, 4) 
 
 # ---------- 1) Pupil (VLT-like) ---------- 
 D = 0.3                # [m]
@@ -120,13 +142,6 @@ phase1 = prop(wf1).phase           # instantaneous PSF with turbulence
 Wf_in_focal=prop(wf1)
 
 # ---------- 5) Bucket definition: 9 µm circle in focal plane ----------
-Fnum_sci = 50.0                 # adjust to your optics if needed 
-f_eff = Fnum_sci * D            # [m] effective focal length
-diam_phys = 9e-6                # [m]
-rad_phys  = diam_phys / 2.0     # [m]
-alpha = rad_phys / f_eff        # [rad] angular radius on focal plane
-
-
 theta = np.sqrt(focal_grid.x**2 + focal_grid.y**2)  # [rad] 
 bucket_mask = (theta <= alpha).astype(float)
 
@@ -138,17 +153,32 @@ power0_in_bucket = np.sum(psf0)
 power0_total     = np.sum(psf0 * w)
 frac0 = power0_in_bucket / power0_total
 
-power1_in_bucket = np.sum(psf1)
-power1_total     = np.sum(psf1 * w)
-frac1 = power1_in_bucket / power1_total
+if Add_Stellar_Noise :
+    noisy_psf1 = abs(utils.add_noise_to_wavefront(Wf_in_focal, D,stellar_magnitude=12))**2
+    # ---------- 6) Proper integration with grid weights (HCIPy 0.7.0) ----------
+    # w = focal_grid.weights 
+    w = 1
+    
+    psf1 = noisy_psf1
+    
+    power1_in_bucket = np.sum(noisy_psf1 * bucket_mask * w)
+    power1_total     = np.sum(noisy_psf1 * w)
+    frac1 = power1_in_bucket / power1_total
+else :
+    power1_in_bucket = np.sum(psf1 * bucket_mask * w)
+    power1_total     = np.sum(psf1 * w)
+    frac1 = power1_in_bucket / power1_total
 
 # ---------- 7) Print results ----------
-#region : prints
-print(f"wavelength = {wavelength} , r0 = {r0_ref} , ")
-print("=== Bucket (9 µm diameter) @ focal plane ===")
-print(f"F/# = {Fnum_sci:.1f},  f_eff = {f_eff:.3f} m")
-print(f"Circle radius (phys): {rad_phys:.3e} m")
-print(f"Circle radius (ang):  {alpha:.3e} rad  (~{alpha*206265:.3f} arcsec)")
+#! all listed in the params file so no need to print really...
+#region : prints 
+print("\n-- current run params --")
+print(f"\nwavelength = {wavelength} , r0 = {r0_ref} ")
+# print("=== Bucket (9 µm diameter) @ focal plane ===")
+# print(f"F/# = {Fnum_sci:.1f},  f_eff = {f_eff:.3f} m")
+# print(f"Circle radius (phys): {rad_phys:.3e} m")
+# print(f"Circle radius (ang):  {alpha:.3e} rad  (~{alpha*206265:.3f} arcsec)")
+
 print("\n-- BEFORE turbulence (unaberrated) --")
 print(f"Power in bucket:  {power0_in_bucket:.6e} (relative)")
 print(f"Total power:      {power0_total:.6e} (relative)")
@@ -158,22 +188,7 @@ print(f"Power in bucket:  {power1_in_bucket:.6e} (relative)")
 print(f"Total power:      {power1_total:.6e} (relative)")
 print(f"Fractional power: {frac1:.6%}")
 #check for energy conservation
-
-print("*"*80)
-I_grid=np.abs(wf1.electric_field)**2
-I_focal=np.abs(Wf_in_focal.electric_field)**2
-weights_grid=wf1.grid.weights
-print(weights_grid)
-weights_focal=Wf_in_focal.grid.weights
-print(weights_focal)
-Wf_in_focal_power=np.sum(Wf_in_focal.power)
-wf1_power=np.sum(wf1.power)
-print("wf1 power: ",np.sum(Wf_in_focal.power))
-print("focal power: ",np.sum(wf1.power))
-Energy_conv=100*Wf_in_focal_power/wf1_power
-print(Energy_conv)
-print("*"*80)
-
+Energy_conservation = utils.check_energy_conservation(wf1,Wf_in_focal)
 #endregion
 #------------
 if USE_OA:
@@ -444,10 +459,10 @@ if save_images:
     
     # focal-plane extent (מחשבים מהמוקד)
     f_m = f_eff
-    xmin_m = psf0.grid.x.min()*f_m
-    xmax_m = psf0.grid.x.max()*f_m
-    ymin_m = psf0.grid.y.min()*f_m
-    ymax_m = psf0.grid.y.max()*f_m
+    xmin_m = initial_psf.grid.x.min()*f_m
+    xmax_m = initial_psf.grid.x.max()*f_m
+    ymin_m = initial_psf.grid.y.min()*f_m
+    ymax_m = initial_psf.grid.y.max()*f_m
     extent_focal_mm = [xmin_m*scale_mm, xmax_m*scale_mm, ymin_m*scale_mm, ymax_m*scale_mm]
     
     fig, axes = plt.subplots(2, 4, figsize=(20, 4.5), dpi=150)
@@ -456,8 +471,8 @@ if save_images:
     utils.plot_phase_screen(fig,axes[0,0],phase_screen,extent_pupil_mm,title="A) Atmosphere Phase")
     utils.plot_psf_on(fig,axes[1,0],power_screen,alpha,f_m,extent_focal_mm,scale_mm,title="A) Atmosphere PSF")
     # --- (b) Unaberrated PSF ---
-    utils.plot_phase_screen(fig,axes[0,1],phase_screen,extent_pupil_mm,mask = ap,title="B) Unaberrated Phase (Before)")
-    utils.plot_psf_on(fig,axes[1,1], ap,alpha,f_m,extent_focal_mm,scale_mm, title="B) Unaberrated PSF (before)")
+    utils.plot_phase_screen(fig,axes[0,1],phase_screen,extent_pupil_mm,mask = aperture,title="B) Unaberrated Phase (Before)")
+    utils.plot_psf_on(fig,axes[1,1], aperture,alpha,f_m,extent_focal_mm,scale_mm, title="B) Unaberrated PSF (before)")
     # --- (c) Turbulent PSF ---
     utils.plot_phase_screen(fig,axes[0,2],phase1,extent_pupil_mm , title="D) Turbulent Phase (after)")
     utils.plot_psf_on(fig,axes[1,2], psf1,alpha,f_m,extent_focal_mm,scale_mm,title="D) Turbulent PSF (after)",log_scale=True)
@@ -466,7 +481,7 @@ if save_images:
     utils.plot_psf_on(fig,axes[1,3],prop(wf_after_dm).power,alpha,f_m,extent_focal_mm,scale_mm,title="AO correction (psf)",log_scale=True) 
     plt.tight_layout()
 
-    # save or show (תמיד נשמור לאותה תיקייה כמו קודם)
+    # save or show 
     base_output_dir = 'simulation_output'
     os.makedirs(base_output_dir, exist_ok=True)
     out_path = os.path.join(
@@ -476,4 +491,6 @@ if save_images:
     plt.savefig(out_path, dpi=300, bbox_inches="tight")
     print(f"✅ Saved combined figure to: {out_path}")
     plt.close(fig)
-utils.update_csv(wavelength, r0_ref, run_number,power0_in_bucket,power0_total,frac0,power1_total,frac1,conservation_of_energy=Energy_conv,num_airy=num_airy,power_after_OA=OA_power,power_in_bucket_after=power1_in_bucket)
+
+if not Run_test_batch :
+    utils.update_csv(wavelength, r0_ref, run_number,focal_dim,power0_in_bucket,power0_total,frac0,power1_in_bucket,power1_total,frac1,conservation_of_energy=Energy_conservation)

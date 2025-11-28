@@ -1,8 +1,5 @@
-import os
 import utils
-from pathlib import Path
 import numpy as np
-import datetime as dt
 import time
 import math
 from OA import set_OA_params
@@ -12,10 +9,21 @@ utils.check_dir()
 try:
     print(massive_simulation_begin_massage)
 except NameError:
-    print(2)
+    print("\"./params.py\" import executed incorrectly!")
+    exit()
+
 path_file="./single_simulation.py" #! <=== needs to be relative path to work
 # edit as needed
-save_images_prompt = input("save images (y/n) ?  ") #! <=== change to save photos in single turblance.py run 
+
+Run_test_batch_prompt = input("run test batch (y/n) ?  ") 
+if Run_test_batch_prompt == "y" :
+    Run_test_batch = True
+elif Run_test_batch_prompt == "n" :
+    Run_test_batch = False
+else : 
+    exit("not a valid input!")
+    
+save_images_prompt = input("save images (y/n) ?  ") 
 if save_images_prompt == "y" :
     save_images = True
 elif save_images_prompt == "n" :
@@ -23,7 +31,7 @@ elif save_images_prompt == "n" :
 else : 
     exit("not a valid input!")
 
-TurbulencLayer_prompt = input("add layer with no turbulance (y/n) ?  ") #! <=== change to add layer without turb photos in single turblance.py run 
+TurbulencLayer_prompt = input("add layer with no turbulance (y/n) ?  ") 
 if TurbulencLayer_prompt == "y" :
     TurbulencLayer = True
 elif TurbulencLayer_prompt == "n" :
@@ -31,21 +39,49 @@ elif TurbulencLayer_prompt == "n" :
 else : 
     exit("not a valid input!")
 
+
+Add_Stellar_Noise_prompt = input("add stellar noise (y/n) ?  ") 
+if Add_Stellar_Noise_prompt == "y" :
+    Add_Stellar_Noise = True
+elif Add_Stellar_Noise_prompt == "n" :
+    Add_Stellar_Noise = False
+else : 
+    exit("not a valid input!")
+
+USE_AO_prompt = input("use adaptive optics (y/n) ?  ") 
+if USE_AO_prompt == "y" :
+    USE_AO = True
+elif USE_AO_prompt == "n" :
+    USE_AO = False
+else : 
+    exit("not a valid input!")
+
 code = open(path_file,"r", encoding="utf-8").read()
 code_obj = compile(code, "single_simulation.py", "exec")
 
-# r0 values
-num_of_r0_samples = 5
-start = 0.05
-end = 0.05
-r0_list = np.linspace(start=start,stop=end,num=num_of_r0_samples,)
-#focal_dim=[8,1,1e-3,500e-6,9e-6]
-# wavelength values
-wavelengths = [1.55e-6, 0.500e-6]
-r0_ref_list=[0.01,0.05,0.03,0.07,0.2]
-# num of runs for values specified values
-N = 1
-N2 = 1
+
+
+if Run_test_batch :
+    num_of_r0_samples = 3
+    start = 0.01
+    end = 0.15
+    r0_list = np.linspace(start=start,stop=end,num=num_of_r0_samples)
+    wavelengths = [1.55e-6]
+    focal_dim=[8]
+    N = 1
+    N2=1
+else :
+    # r0 values
+    num_of_r0_samples = 10
+    start = 0.01
+    end = 0.15
+    r0_list = np.linspace(start=start,stop=end,num=num_of_r0_samples,)
+    focal_dim=[8,1,1e-3,500e-6,9e-6]
+    # wavelength values
+    wavelengths = [1.55e-6, 0.500e-6]
+    # num of runs for values specified values
+    N = 5 
+    N2=4
 count = 1
 wavelengths=1.55e-6
 time_for_start=time.time()
