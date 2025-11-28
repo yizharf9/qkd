@@ -114,7 +114,6 @@ for num_airy in num_arays:
                             "Multy_use_AO": Multy_use_AO,
                             #!if Multy_use_AO is True then AO use r0_ref_list no r0_ref
                             #!Only if r0_ref_list is none Then AO use r0_ref
-                            ""
                         }
             number_of_runs= len(num_arays) * N
             print(f"\n=== run_number={count - 1} finished out of {number_of_runs } ({count/(number_of_runs) * 100:.3f}%) ===")
