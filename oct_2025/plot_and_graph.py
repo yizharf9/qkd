@@ -58,6 +58,8 @@ def plot_E_and_D():
         frac_01=D_mean-E_mean
         fn_01=frac_01
         print(fn_01,airy)
+        plt.clf
+        Fig_E_and_D=plt.figure
         # E_norm – dashed
         plt.errorbar(r0_vals, E_mean, yerr=E_std, 
                     fmt='--o', color=color, label=f"without correction (airy={airy} $\\frac{{\\lambda}}{{D}}$)")
@@ -71,6 +73,15 @@ def plot_E_and_D():
     plt.grid(True, alpha=0.3)
     plt.legend()
     plt.tight_layout()
+    base_output_dir = 'Plots'
+    os.makedirs(base_output_dir, exist_ok=True)
+    out_path = os.path.join(
+    base_output_dir,
+    f"without correction[E] and with correction[D] vs r0_ref for different num_airy.png"
+    )
+    plt.savefig(out_path, dpi=300, bbox_inches="tight")
+    print(f"✅ Saved combined figure to: {out_path}")
+    plt.close()    
     plt.show()
 def plot_pib_vs_r0_for_column(
     df,
@@ -126,7 +137,7 @@ def plot_before_after_from_out_csv(
     csv_path="./out.csv",
     x_col="r0_ref",
     y_before_col="power_in_bucket_before_turbulance",
-    y_after_col="power_in_bucket_after_turbula",
+    y_after_col="power_in_bucket_after_turbulance",
     group_col="num_airy",
     run_col="run_number",
     # labels & titles (you can change these when you call the function)
@@ -175,6 +186,15 @@ def plot_before_after_from_out_csv(
     )
 
     fig.tight_layout()
+    base_output_dir = 'Plots'
+    os.makedirs(base_output_dir, exist_ok=True)
+    out_path = os.path.join(
+    base_output_dir,
+    f"{title_after}"
+    )
+    plt.savefig(out_path, dpi=300, bbox_inches="tight")
+    print(f"✅ Saved combined figure to: {out_path}")
+
     return fig, axes
 if __name__ == "__main__":
     # מריץ את הפונקציה על הקובץ הקבוע
@@ -186,6 +206,6 @@ if __name__ == "__main__":
         title_before="Power in bucket vs r0_ref (before turbulence)",
         title_after="Power in bucket vs r0_ref (after turbulence)",
     )
-    plot_E_and_D()
+    Fig_E_and_D=plot_E_and_D()
+ 
 
-    plt.show()

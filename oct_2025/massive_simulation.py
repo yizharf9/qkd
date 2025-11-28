@@ -54,6 +54,15 @@ elif USE_AO_prompt == "n" :
     USE_AO = False
 else : 
     exit("not a valid input!")
+if USE_AO:
+    Multy_use_AO_prompt = input("USE multy mode AO (y/n)? ")
+    if Multy_use_AO_prompt.lower() == "y":
+        Multy_use_AO = True
+    elif Multy_use_AO_prompt.lower() == "n":
+        Multy_use_AO == False
+    else:
+        exit("Not a valid input! Please enter 'y' or 'n'.")
+
 
 code = open(path_file,"r", encoding="utf-8").read()
 code_obj = compile(code, "single_simulation.py", "exec")
@@ -96,13 +105,16 @@ for num_airy in num_arays:
                             "run_number": run_number,
                             "wavelength": 1.55e-6,
                             "r0_ref": 0.1,  # example value for r0_ref 
-                            #!if r0_ref_list has value then OA use r0_ref_list no r0_ref
                             "save_images": save_images,  # example value for r0_ref
                             "TurbulencLayer": True,
-                            "USE_OA": True, # !Will te a long run to run if True
+                            "USE_AO": True, # !Will te a long run to run if True
                             "num_airy": num_airy,
                             "r0_ref_list":r0_ref_list,
                             "Add_Stellar_Noise":Add_Stellar_Noise,
+                            "Multy_use_AO": Multy_use_AO,
+                            #!if Multy_use_AO is True then AO use r0_ref_list no r0_ref
+                            #!Only if r0_ref_list is none Then AO use r0_ref
+                            ""
                         }
             number_of_runs= len(num_arays) * N
             print(f"\n=== run_number={count - 1} finished out of {number_of_runs } ({count/(number_of_runs) * 100:.3f}%) ===")
@@ -126,10 +138,13 @@ if TurbulencLayer == True:
                             "save_images": save_images,  # example value for r0_ref
                             "TurbulencLayer": False,
                             "num_airy": num_airy,
-                            "USE_OA": True,
+                            "USE_AO": True,
                             "num_airy": num_airy,
                             "r0_ref_list":r0_ref_list,
-                            "Add_Stellar_Noise":Add_Stellar_Noise
+                            "Add_Stellar_Noise":Add_Stellar_Noise,
+                            "Multy_use_AO": Multy_use_AO,
+                            #!if Multy_use_AO is True then AO use r0_ref_list no r0_ref
+                            #!Only if r0_ref_list is none Then AO use r0_ref
                             }
                     number_of_runs=len(r0_list) * len(num_arays) * N
                     print(f"\n=== run_number={count - 1} finished out of {number_of_runs } ({count/(number_of_runs) * 100:.3f}%) ===")

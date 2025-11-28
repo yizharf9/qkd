@@ -6,16 +6,19 @@ This file contains all the parameters for the project.
 """
 
 
-#------setting parameters for OA.py-----------
-TurbulencLayer = True          # keep your original flag name
-wavelength=1.55e-6            # [m]
+#------setting parameters for AO.py-----------
+
 #-------massive_simulation.py-----------
 m="\n"
 m+="Starting massive simution runs..."
 m+="Current working directory:"+str(os.getcwd())
 m+="Script start time:"+str(dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 massive_simulation_begin_massage=m
-#--------OA PARAMS.py-----------
+#--------AO PARAMS.py-----------
+TurbulencLayer = True          # keep your original flag name
+wavelength=1.55e-6            # [m]
+r0_ref_list=[0.01,0.05,0.03,0.07,0.2]
+q_AO=4
 num_modes = 500
 telescope_diameter=0.3
 N=240
