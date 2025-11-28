@@ -29,14 +29,15 @@ def check_dir():
 def update_csv( wavelength,
                 r0_ref_val,
                 run_num,
-                focal_dim,
                 power_in_bucket_before,
                 total_power_before,
                 precentage_before,
-                power_in_bucket_after,
                 total_power_after,
                 precentage_after,
                 conservation_of_energy,
+                num_airy,
+                power_after_OA=None,
+                power_in_bucket_after=1111111
                 ):
 
 #head= wavelength ,r0_ref,run_number,focsl_dim,power_in_bucket_before_turbulance,total_power_before_turbulance,precentage_before_turbulance,power_in_bucket_after_turbulance,total_power_after_turbulance,precentage_after_turbulance,conservation_of_energy[%],time
@@ -46,7 +47,7 @@ def update_csv( wavelength,
         "wavelength",
         "r0_ref",
         "run_number",
-        "focsl_dim",
+        "num_airy"
         "power_in_bucket_before_turbulance",
         "total_power_before_turbulance",
         "precentage_before_turbulance",
@@ -54,6 +55,7 @@ def update_csv( wavelength,
         "total_power_after_turbulance",
         "precentage_after_turbulance",
         "conservation_of_energy[%]",
+        "power_after_OA",
         "time"
         ]
 
@@ -61,15 +63,15 @@ def update_csv( wavelength,
         "wavelength": wavelength,
         "r0_ref": r0_ref_val,
         "run_number": run_num,
-        "focal_dim":focal_dim,
+        "num_airy": num_airy,
         "power_in_bucket_before_turbulance": power_in_bucket_before,
         "total_power_before_turbulance": total_power_before,
         "precentage_before_turbulance": precentage_before,
-        
         "power_in_bucket_after_turbulance": power_in_bucket_after,
         "total_power_after_turbulance": total_power_after,
         "precentage_after_turbulance": precentage_after,
         "conservation_of_energy[%]" : conservation_of_energy,
+        "power_after_OA": power_after_OA,
         "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }])
 
@@ -99,8 +101,11 @@ def plot_phase_screen(fig,ax,phase_screen,extent_pupil_mm,mask=None,title="Turbu
     cb.set_label('Phase [rad]')
 
 # helper לציור PSF
-def plot_psf_on(fig,ax, psf,alpha,f_m,extent_focal_mm,scale_mm, title = "PSF plot"):
-    psf_img = np.log10((psf / psf.max()).shaped + 1e-12)
+def plot_psf_on(fig,ax, psf,alpha,f_m,extent_focal_mm,scale_mm, title = "PSF plot",log_scale=True):
+    if log_scale:
+        psf_img = np.log10((psf / psf.max()).shaped + 1e-12)
+    else:
+        psf_img = (psf / psf.max()).shaped
     im = ax.imshow(psf_img, origin='lower', extent=extent_focal_mm,cmap='inferno', vmin=-6, vmax=0)
     circ = mpatches.Circle((0.0, 0.0), radius=alpha*f_m*scale_mm,fill=False, linewidth=1.5)
     ax.add_patch(circ)

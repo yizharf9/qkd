@@ -11,6 +11,7 @@ import utils
 from math import e
 from datetime import datetime,date
 from utils import *
+import params
 def check_axis(run_Cn2: bool,r0_col) -> str:
     if run_Cn2:
         pass # switch to Cn2 for x axis
@@ -18,80 +19,176 @@ def check_axis(run_Cn2: bool,r0_col) -> str:
         r0_col=r0_col
     return r0_col
     
-    
+import pandas as pd
+import matplotlib.pyplot as plt
 
-#-------prams
-To_run=True
-after=True
-run_Cn2=False
-save_images=True
+df=pd.read_csv(path_file)
+df1=df[1:91]
+print(len(df1))
+def plot_E_and_D():
+        # --- Load data ---
+    df = pd.read_csv("AO_simulation_log.csv")
+    norm=params.norm
+    # --- Columns ---
+    t_col   = "timestep"
+    E_col   = "E_power_sum"
+    D_col   = "D_power_sum"
+    r0_col  = "r0_ref"
+    airy_col = "num_airy"
+    # --- Compute new columns ---
+    df["E_norm"] = df[E_col] / norm
+    df["D_norm"] = df[D_col] / norm  # ← תיקון: בעבר כתבת פעמיים E_col
+    # --- Prepare figure ---
+    plt.figure(figsize=(10,6))
+    # --- unique Airy groups ---
+    airy_groups = sorted(df[airy_col].unique())
 
-#_-----prams for calculations
-lam_ref = 500e-9  
-SR_SHORT_COEFF = 0.134
-D=8
-#--- 0) Ensure correct working directory ---
-utils.check_dir()
-# --- 1) Load CSV ---
-[df,structure]=utils.Load_csv(path_file)
+    # colormap
+    colors = plt.cm.viridis(np.linspace(0,1,len(airy_groups)))
 
+    for color, airy in zip(colors, airy_groups):
 
-#print(structure)
-#-------pick-------------
-r0_col  =utils.pick(df.columns, "r0", "r_0", "r0_ref", "r_0_ref","r0_ref")    
-PIB_col = utils.pick(df.columns,"total_power_after_turbulance")
-wl_col  = utils.pick(df.columns, "wavelength", "lambda", "lam", "wl")
-conservation_of_energy=utils.pick(df.columns,"conservation of energy[%]")
-focal_dim_col=utils.pick(df.columns, 'focal_dim', 'focsl_dim', 'focsl', 'focal', 'focal_dim')
-#df = df[df[focal_dim_col]==1]
+        sub = df[df[airy_col] == airy]
 
-if not (r0_col and wl_col and focal_dim_col ):
-    raise ValueError(f"Need columns for r0, smf, wavelength. Found: {list(df.columns)}")
-    # --- 4) Clean types ---
+        # group by r0 and compute mean/std
+        grouped = sub.groupby(r0_col)
 
-df[r0_col]  = pd.to_numeric(df[r0_col], errors="coerce")
-df[r0_col] = np.where(df[r0_col] == 1000000000, 1, df[r0_col])
-df['actual_r0_col'] = df[r0_col] * (df[wl_col] / lam_ref) ** (6.0 / 5.0)    
-df[PIB_col] = pd.to_numeric(df[PIB_col], errors="coerce")
-df[wl_col]  = pd.to_numeric(df[wl_col], errors="coerce")
-df = df.dropna(subset=['actual_r0_col', wl_col])
-df["Cn2"]= Cn_squared_from_fried_parameter(df[r0_col],df[wl_col]).to_numpy()
-df["Cn2"] =pd.to_numeric(df["Cn2"], errors="coerce")
-df['conservation_of_energy[%]'] = pd.to_numeric(df['conservation_of_energy[%]'], errors='coerce')
+        r0_vals = grouped[r0_col].mean().values
+        E_mean  = grouped["E_norm"].mean().values
+        E_std   = grouped["E_norm"].std().values
+        D_mean  = grouped["D_norm"].mean().values
+        D_std   = grouped["D_norm"].std().values
+        frac_01=D_mean-E_mean
+        fn_01=frac_01
+        print(fn_01,airy)
+        # E_norm – dashed
+        plt.errorbar(r0_vals, E_mean, yerr=E_std, 
+                    fmt='--o', color=color, label=f"without correction (airy={airy} $\\frac{{\\lambda}}{{D}}$)")
 
-
-
-
-    # 1) Group by settings and compute stats of the measured value (SMF)
-x_axis=check_axis(run_Cn2,r0_col='actual_r0_col')
-print("x_axis:",x_axis)
-group_cols = [wl_col, x_axis,focal_dim_col]          # settings that define a case
-val_col    = PIB_col                   # the measured metric to summarize
-if To_run:
-    # Consistent styling across calls (optional)
-    wavelengths_value = sorted(df[wl_col].unique())
-    focal_value = sorted(df[focal_dim_col].unique())
-    #print("wavelengths:", wavelengths_value)
-    #print("focal values:", focal_value)
-    # Subplot A: lin–lin
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-    plot_mean_line_loglin(
-        df, wl_col, focal_dim_col,wavelengths_value,focal_value,x_axis, PIB_col,axes[0],
-        title="PIB after vs r0 (log-lin)", x_label="r0_ref [m]", y_label="Mean PIB")
-    plot_mean_line_loglin(
-        df, wl_col, focal_dim_col,wavelengths_value,focal_value,x_axis,'conservation_of_energy[%]', axes[1],
-        title="Conservation of energy vs r0 (log-lin)", x_label="r0_ref [m]", y_label="Conservation of energy [%]")
+        # D_norm – solid
+        plt.errorbar(r0_vals, D_mean, yerr=D_std, 
+                    fmt='-s', color=color, label=f"with correction (airy={airy} $\\frac{{\\lambda}}{{D}}$)")    
+    plt.xlabel("r0_ref[m]")
+    plt.ylabel("Normalized Power")
+    plt.title("without correction[E] and with correction[D] vs r0_ref for different num_airy")
+    plt.grid(True, alpha=0.3)
+    plt.legend()
     plt.tight_layout()
-    print("done plotting")
-    print("Date: ",datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-plt.tight_layout()
+    plt.show()
+def plot_pib_vs_r0_for_column(
+    df,
+    y_col,
+    ax,
+    x_col="r0_ref",
+    group_col="num_airy",
+    run_col="run_number",
+    x_label="r0_ref[m]",
+    y_label=None,
+    title="",
+    scatter_alpha=0.4,
+    line_width=2.0,
+):
+    """
+    Plot all points of y_col vs x_col, colored by group_col (num_airy),
+    and add mean trend line per (group_col, x_col) over run_number.
+    """
+    if y_label is None:
+        y_label = y_col
 
-if save_images:
-    base_output_dir = "./plots"
-    os.makedirs(base_output_dir, exist_ok=True)
-    fname = f"PIB_and_energy_conservation_vs_{'Cn2' if run_Cn2 else 'r0'}.png"
-    out_path = os.path.join(base_output_dir, fname)
-    fig.savefig(out_path, dpi=300, bbox_inches="tight")
-    print(f"Saved image to: {out_path}")
+    # Loop over each num_airy and plot
+    for num_airy_val, group in df.groupby(group_col):
+        # Scatter: all raw points
+        ax.scatter(
+            group[x_col],
+            group[y_col],
+            alpha=scatter_alpha,
+            label=f"{group_col}={num_airy_val}",
+        )
 
-plt.show()
+        # Mean trend: mean over run_number for each r0_ref (per num_airy)
+        means = (
+            group
+            .groupby(x_col)[y_col]
+            .mean()
+            .reset_index()
+            .sort_values(by=x_col)
+        )
+
+        ax.plot(
+            means[x_col],
+            means[y_col],
+            linewidth=line_width,
+        )
+
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+    ax.set_title(title)
+    ax.grid(True)
+    ax.legend()
+def plot_before_after_from_out_csv(
+    csv_path="./out.csv",
+    x_col="r0_ref",
+    y_before_col="power_in_bucket_before_turbulance",
+    y_after_col="power_in_bucket_after_turbula",
+    group_col="num_airy",
+    run_col="run_number",
+    # labels & titles (you can change these when you call the function)
+    x_label="r0_ref",
+    y_before_label="Power in bucket (before turbulence)[w]",
+    y_after_label="Power in bucket (after turbulence)[w]",
+    title_before="Power in bucket vs r0_ref (before turbulence)",
+    title_after="Power in bucket vs r0_ref (after turbulence)",
+    figsize=(14, 6),
+):
+    """
+    Create a figure with two subplots:
+    1) y_before_col vs x_col
+    2) y_after_col vs x_col
+    Both colored by num_airy with mean trend lines.
+    """
+    # Load CSV
+    df = pd.read_csv(csv_path)
+
+    fig, axes = plt.subplots(1, 2, figsize=figsize)
+
+    # Figure 1 – before turbulence
+    plot_pib_vs_r0_for_column(
+        df1,
+        y_col=y_before_col,
+        ax=axes[0],
+        x_col=x_col,
+        group_col=group_col,
+        run_col=run_col,
+        x_label=x_label,
+        y_label=y_before_label,
+        title=title_before,
+    )
+
+    # Figure 2 – after turbulence
+    plot_pib_vs_r0_for_column(
+        df1,
+        y_col=y_after_col,
+        ax=axes[1],
+        x_col=x_col,
+        group_col=group_col,
+        run_col=run_col,
+        x_label=x_label,
+        y_label=y_after_label,
+        title=title_after,
+    )
+
+    fig.tight_layout()
+    return fig, axes
+if __name__ == "__main__":
+    # מריץ את הפונקציה על הקובץ הקבוע
+    fig, axes = plot_before_after_from_out_csv(
+        csv_path=path_file,
+        x_label="r0_ref",
+        y_before_label="Power in bucket (before turbulence)",
+        y_after_label="Power in bucket (after turbulence)",
+        title_before="Power in bucket vs r0_ref (before turbulence)",
+        title_after="Power in bucket vs r0_ref (after turbulence)",
+    )
+    plot_E_and_D()
+
+    plt.show()
