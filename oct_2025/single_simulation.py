@@ -2,6 +2,7 @@ import os
 import utils
 import numpy as np
 import matplotlib.pyplot as plt
+import warnings
 try:
     from hcipy import *
 except Exception as e:
@@ -10,6 +11,7 @@ except Exception as e:
 # ----------------------------- Directory Check -----------------------------
 utils.check_dir()
 # ----------------------------- Parameters -----------------------------
+warnings.simplefilter('ignore', RuntimeWarning)
 try:
     TurbulencLayer
 except NameError:
@@ -28,9 +30,17 @@ try:
 except NameError:
     r0_ref = 0.1
 try:
+    noise_var
+except NameError:
+    noise_var = 1e4
+try:
     focal_dim
 except NameError:
     focal_dim=9e-6
+try:
+    sent_signal
+except NameError:
+    sent_signal=True
 
 try:
     save_images
@@ -105,11 +115,16 @@ if TurbulencLayer is True:
 else:
     wf1 = layer(wf0)      
 
+if sent_signal is False:
+    wf1.total_power = 0
+
 if Noise is True:
     Wf_in_focal=prop(wf1)
-    Wf_in_focal = utils.add_noise_to_psf(Wf_in_focal,D,SNR=5)
+    Wf_in_focal = utils.add_noise_to_psf(Wf_in_focal,noise_var)
+    
     psf1 = Wf_in_focal.power
     phase1 = Wf_in_focal.phase           # instantaneous PSF with turbulence
+    # exit(f"min : {psf1.min()} max : {psf1.max()}")
 else : 
     psf1 = prop(wf1).power           # instantaneous PSF with turbulence
     phase1 = prop(wf1).phase           # instantaneous PSF with turbulence
@@ -216,4 +231,19 @@ if save_images:
     print(f"✅ Saved combined figure to: {out_path}")
     plt.close(fig)
 
-utils.update_csv(wavelength, r0_ref, run_number,focal_dim,power0_in_bucket,power0_total,frac0,power1_in_bucket,power1_total,frac1,conservation_of_energy=Energy_conv)
+params = {
+    "wavelength":wavelength,
+    "r0_ref": r0_ref,
+    "run_number": run_number,
+    "focal_dim":focal_dim,
+    "power0_in_bucket":power0_in_bucket,
+    "power0_total":power0_total,
+    "frac0":frac0,
+    "power1_in_bucket":power1_in_bucket,
+    "power1_total":power1_total,
+    "frac1":frac1,
+    "Energy_conv":Energy_conv,
+    "sent_signal":sent_signal,
+    "noise_var":noise_var
+}
+utils.update_csv(**params)

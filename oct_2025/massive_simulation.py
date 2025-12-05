@@ -41,15 +41,16 @@ code_obj = compile(code, "single_simulation.py", "exec")
 num_of_r0_samples = 4
 start = 0.01
 end = 0.15
-r0_list = np.linspace(start=start,stop=end,num=num_of_r0_samples)
-# r0_list = [0.075]
+# r0_list = np.linspace(start=start,stop=end,num=num_of_r0_samples)
+r0_list = [0.075]
 focal_dim=[500e-6]
 # wavelength values
 # wavelengths = [1.55e-6, 0.500e-6]
 wavelengths = [1.55e-6]
+variances = [1e4,1e5,1e6,1e7,1e8]
 
 # num of runs for values specified values
-realizations_per_run = 200 
+N = 50
 realizations_per_run_no_turb=4
 
 count = 1
@@ -58,25 +59,29 @@ print("run with TurbulencLayer")
 for focal in focal_dim:
     for wavelength in wavelengths :
         for r0_ref in r0_list :
-            for run_number in range(1,realizations_per_run+1):  # example run number
-                ns = {
-                        "__name__": "__main__",
-                        "__file__": str("single_simulation.py"),   # so Path(__file__) works inside turblance.py
-                        "run_number": run_number,
-                        "wavelength": wavelength,
-                        "r0_ref": r0_ref,  
-                        "save_images": save_images,  
-                        "Noise": Noise,  
-                        "TurbulencLayer": TurbulencLayer,
-                        "focal_dim": focal,
-                    }
-                number_of_runs=len(r0_list) * len(wavelengths) * realizations_per_run *len(focal_dim)
-                print(f"\n=== run_number={count - 1} finished out of {number_of_runs } ({count/(number_of_runs) * 100:.3f}%) ===")
-                exec(code_obj, ns,ns)  # fresh globals per run (no locals dict)
-                current_time_for_run=time.time()
-                count += 1
-                T2FInish=utils.time_asstimate(current_time_for_run,time_for_start,count,number_of_runs)
-                print("Time asstimate to finish: "+str(int(T2FInish/60))+" minutes")
+            for var in variances :
+                for sent_signal in [True,False] :
+                    for run_number in range(1,N+1):  # example run number
+                        ns = {
+                                "__name__": "__main__",
+                                "__file__": str("single_simulation.py"),   # so Path(__file__) works inside turblance.py
+                                "run_number": run_number,
+                                "wavelength": wavelength,
+                                "r0_ref": r0_ref,  
+                                "var": var,  
+                                "sent_signal": sent_signal,  
+                                "save_images": save_images,  
+                                "Noise": Noise,  
+                                "TurbulencLayer": TurbulencLayer,
+                                "focal_dim": focal,
+                            }
+                        number_of_runs = len(wavelengths) * len(r0_list) * N * len(focal_dim) * len(variances) * 2
+                        print(f"\n=== run_number={count - 1} finished out of {number_of_runs } ({count/(number_of_runs) * 100:.3f}%) ===")
+                        exec(code_obj, ns,ns)  # fresh globals per run (no locals dict)
+                        current_time_for_run=time.time()
+                        count += 1
+                        T2FInish=utils.time_asstimate(current_time_for_run,time_for_start,count,number_of_runs)
+                        print("Time asstimate to finish: "+str(int(T2FInish/60))+" minutes")
 
 print("run without TurbulencLayer")
 if TurbulencLayer :

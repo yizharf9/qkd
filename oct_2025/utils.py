@@ -26,52 +26,12 @@ def check_dir():
         exit("Execution stopped. Please run the script from the 'oct_2025' directory.")
     print("-" * 60) # Visual separator
 
-def update_csv( wavelength,
-                r0_ref_val,
-                run_num,
-                focal_dim,
-                power_in_bucket_before,
-                total_power_before,
-                precentage_before,
-                power_in_bucket_after,
-                total_power_after,
-                precentage_after,
-                conservation_of_energy,
-                ):
-
-#head= wavelength ,r0_ref,run_number,focsl_dim,power_in_bucket_before_turbulance,total_power_before_turbulance,precentage_before_turbulance,power_in_bucket_after_turbulance,total_power_after_turbulance,precentage_after_turbulance,conservation_of_energy[%],time
-
+def update_csv(**kwargs):
     file_path = "./massive_output.csv"
-    columns = [
-        "wavelength",
-        "r0_ref",
-        "run_number",
-        "focsl_dim"
-        "power_in_bucket_before_turbulance",
-        "total_power_before_turbulance",
-        "precentage_before_turbulance",
-        "power_in_bucket_after_turbulance",
-        "total_power_after_turbulance",
-        "precentage_after_turbulance",
-        "conservation_of_energy[%]"
-        "time"
-        ]
-
-    new_row_df = pd.DataFrame([{
-        "wavelength": wavelength,
-        "r0_ref": r0_ref_val,
-        "run_number": run_num,
-        "focal_dim":focal_dim,
-        "power_in_bucket_before_turbulance": power_in_bucket_before,
-        "total_power_before_turbulance": total_power_before,
-        "precentage_before_turbulance": precentage_before,
-        
-        "power_in_bucket_after_turbulance": power_in_bucket_after,
-        "total_power_after_turbulance": total_power_after,
-        "precentage_after_turbulance": precentage_after,
-        "conservation of energy[%]" : conservation_of_energy,
-        "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }])
+    kwargs["time"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    columns = [key for key,val in kwargs.items()]
+    print(kwargs)
+    new_row_df = pd.DataFrame([kwargs])
 
     if os.path.exists(file_path):
         new_row_df.to_csv(file_path, mode='a', header=False, index=False)
@@ -79,40 +39,14 @@ def update_csv( wavelength,
         new_row_df.to_csv(file_path, mode='w', header=columns, index=False)
     print("Operation complete. Data has been saved.")
 
-def add_noise_to_psf(
-        propagated_wavefront,
-        telescope_diameter,
-        SNR = 5,
-        stellar_magnitude = 8.0,
-        flux_zero_point = 1.5e10 ,
-        throughput = 0.8,
-        exposure_time = 0.01  ,
-    ):
-    focal_grid = propagated_wavefront.grid
-    collecting_area = np.pi * (telescope_diameter/2)**2
-
-    # Total photons/sec from the star entering the telescope
-    photon_flux = flux_zero_point * 10**(-0.4 * stellar_magnitude) * collecting_area * throughput
-
-    # Scale it to physical units (Photons / second)
-    image_photons_per_sec = propagated_wavefront.power * photon_flux * SNR
-
-    detector = NoisyDetector(focal_grid)
-
-    # Configure Noise Properties
-    detector.include_photon_noise = True
-    detector.read_noise = 5.0           # rms electrons
-    detector.dark_current_rate = 0.1     # electrons/sec/pixel (usually low for IR)
-    # detector.flat_field = 0.05         # Optional: 5% pixel-to-pixel sensitivity variation
-
-    detector.integrate(image_photons_per_sec, dt=exposure_time)
-
-    image_noisy = detector.read_out()
-
-    wf_noisy = Wavefront(image_noisy)
-    return wf_noisy
-
-
+def add_noise_to_psf(wavefront,noise_var = 1):
+    noise_amp = np.random.randn(*wavefront.electric_field.shape) * noise_var
+    noise_phase = np.random.rand(*wavefront.electric_field.shape) * 2 * np.pi
+    noise = noise_amp * np.exp(1j*noise_phase)
+    print(noise)
+    noisy_field = wavefront.electric_field + noise
+    wf = Wavefront(noisy_field)
+    return wf
 
 def plot_phase_screen(fig,ax,phase_screen,extent_pupil_mm,mask=None,title="Turbulence phase screen [rad]"):
     # ax = axes[0]    
@@ -286,8 +220,8 @@ def plot_mean_line_loglin(
 
     # --- aggregation: mean of y per (wl, focal, x) ---
     g = (work
-         .groupby([wl_col, focal_col, x_col], as_index=False)[y_col]
-         .mean()
+            .groupby([wl_col, focal_col, x_col], as_index=False)[y_col]
+            .mean()
         )
 
     # --- required x values check ---
