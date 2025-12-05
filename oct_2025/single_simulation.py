@@ -32,7 +32,7 @@ except NameError:
 try:
     noise_var
 except NameError:
-    noise_var = 1e4
+    noise_var = 1e17
 try:
     focal_dim
 except NameError:

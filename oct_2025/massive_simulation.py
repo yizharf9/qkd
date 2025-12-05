@@ -41,13 +41,14 @@ code_obj = compile(code, "single_simulation.py", "exec")
 num_of_r0_samples = 4
 start = 0.01
 end = 0.15
-# r0_list = np.linspace(start=start,stop=end,num=num_of_r0_samples)
-r0_list = [0.075]
+r0_list = np.linspace(start=start,stop=end,num=num_of_r0_samples)
+# r0_list = [0.075]
 focal_dim=[500e-6]
 # wavelength values
 # wavelengths = [1.55e-6, 0.500e-6]
 wavelengths = [1.55e-6]
-variances = [1e4,1e5,1e6,1e7,1e8]
+variances = np.logspace(4,7,7)
+# [1e4,1e5,1e6,1e7,1e8]
 
 # num of runs for values specified values
 N = 50
@@ -59,7 +60,7 @@ print("run with TurbulencLayer")
 for focal in focal_dim:
     for wavelength in wavelengths :
         for r0_ref in r0_list :
-            for var in variances :
+            for noise_var in variances :
                 for sent_signal in [True,False] :
                     for run_number in range(1,N+1):  # example run number
                         ns = {
@@ -68,7 +69,7 @@ for focal in focal_dim:
                                 "run_number": run_number,
                                 "wavelength": wavelength,
                                 "r0_ref": r0_ref,  
-                                "var": var,  
+                                "noise_var": noise_var,  
                                 "sent_signal": sent_signal,  
                                 "save_images": save_images,  
                                 "Noise": Noise,  
