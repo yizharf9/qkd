@@ -149,7 +149,7 @@ def plot_ber_vs_noise(summary_csv_path="./decision_rules_summary.csv", pixels_in
     plt.tight_layout()
     plt.show()
 
-def plot_power_distribution(target_r0, noise_var, csv_path="./massive_output.csv"):
+def plot_power_distribution(target_r0, noise_var, csv_path="./massive_output.csv"): 
     """
     Plots the histogram of power in bucket for a specific condition
     and overlays the decision threshold.
@@ -221,7 +221,7 @@ if __name__ == "__main__":
     # 2. Plot the BER curves
     # IMPORTANT: Update pixels_in_bucket to the actual number of pixels used in your simulation bucket.
     # Default is 1.0 (assuming noise_var is already total bucket variance or 1 pixel bucket).
-    plot_ber_vs_noise(pixels_in_bucket=1.0)
+    plot_ber_vs_noise(pixels_in_bucket=9e-6)
     
     # 3. Example of plotting distribution for a specific case
     # You can pick a specific r0 and noise from your CSV to visualize
@@ -229,6 +229,6 @@ if __name__ == "__main__":
     # Example: Picking the first combination found in the CSV
     df_temp = pd.read_csv("./massive_output.csv")
     if not df_temp.empty:
-        sample_r0 = df_temp['r0_ref'].iloc[0]
-        sample_noise = df_temp['noise_var'].iloc[0]
+        sample_r0 = df_temp['r0_ref'].iloc[1]
+        sample_noise = df_temp['noise_var'].iloc[1]
         plot_power_distribution(sample_r0, sample_noise)
