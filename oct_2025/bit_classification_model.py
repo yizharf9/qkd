@@ -196,16 +196,90 @@ if not os.path.exists("./massive_output.csv"):
     dummy_df.to_csv("./massive_output.csv", index=False)
 
 if __name__ == "__main__":
-    # 1. Process conditions (Calculates stable SNR + Standard Deviation)
-    process_all_conditions()
+    # # 1. Process conditions (Calculates stable SNR + Standard Deviation)
+    # process_all_conditions()
     
-    # 2. Parameters
-    wl = 1.55e-6
-    f_num = 50.0
-    q_factor = 8.0
-    bucket_diameter = 9e-6
-    N_pixels = estimate_pixels_in_bucket(wl, f_num, q_factor, bucket_diameter)
+    # # 2. Parameters
+    # wl = 1.55e-6
+    # f_num = 50.0
+    # q_factor = 8.0
+    # bucket_diameter = 9e-6
+    # N_pixels = estimate_pixels_in_bucket(wl, f_num, q_factor, bucket_diameter)
     
-    # 3. Plot BER vs SNR (Linear Y - Default)
-    print("Plotting Linear Y scale with Error Bars...")
-    plot_ber_vs_noise(pixels_in_bucket=N_pixels, use_log_y=True)
+    # # 3. Plot BER vs SNR (Linear Y - Default)
+    # print("Plotting Linear Y scale with Error Bars...")
+    # plot_ber_vs_noise(pixels_in_bucket=N_pixels, use_log_y=True)
+    
+    
+    def create_bit_stream(gain = 1,var = 1,N=1000):
+        
+        stream = np.hstack((np.zeros(N//2),np.ones(N - N//2)))
+        stream = np.vstack((stream,stream))
+
+        noise = np.random.randn(N) * var
+        stream[0] = stream[0] * gain + noise
+        return np.arange(N),stream
+    
+    
+    def set_decision_rule(data):
+        clf = DecisionTreeClassifier(max_depth=1, random_state=42)
+        X,y = data[0].reshape(-1,1),data[1]==1
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        clf.fit(X_train,y_train)
+        acc = np.sum(clf.predict(X_test) == y_test)/len(X_test)
+        return clf,acc
+
+    
+    def plot_decision_rule(Var = 0.1,Gain = 0.5):
+        # train
+        time_stamps,train_stream = create_bit_stream(gain=Gain,var=Var,N=100)
+        clf,_ = set_decision_rule(train_stream)
+        
+        # test
+        time_stamps,test_stream = create_bit_stream(gain=Gain,var=Var,N=1000)
+        predictions = clf.predict(test_stream[0].reshape(-1,1))
+        y = test_stream[1]
+        
+        acc = np.sum(predictions == y) / len(y)
+        print(f"acc : {acc}")
+        
+        threshold = clf.tree_.threshold[0]
+        colors = np.where(predictions == y, 'green', 'red')
+        
+        # 5. Plotting
+        plt.figure(figsize=(10, 6))
+
+        # Scatter plot with the dynamic colors
+        plt.scatter(time_stamps, test_stream[0], c=colors, alpha=0.7, s=50,label = "noisy signal pred.")
+        plt.scatter(time_stamps, test_stream[1], alpha=0.7, s=50,label = "sent signal")
+
+        threshold = clf.tree_.threshold[0]
+        plt.axhline(y=threshold, color='blue', linestyle='--', label=f'Decision Threshold ({threshold:.2f})')
+        plt.title(f"Classification Accuracy (Green=Correct, Red=Wrong), BER : {1-acc :.1%}")
+        plt.xlabel("Time Stamp")
+        plt.ylabel("Signal Value [Watt]")
+        plt.legend()
+        plt.show()
+    
+    
+    # plot_decision_rule()
+    
+    num = 10 
+    N = 5
+    accuracies = []
+    Vars = np.logspace(-8,-1,num)
+    Gains = np.logspace(-8,-1,num)
+    
+    for i in range(len(Vars)):
+        avg = 0
+        for i in range(N):
+            _,data = create_bit_stream(Vars[i],N=100000)
+            # print(data)
+            clf,acc = set_decision_rule(data)
+            # print(f"var = {Vars[i]}")
+            # print(f"acc = {acc}\n")
+            avg += acc
+        accuracies.append(avg/N)
+    # print(len(accuracies))
+    plt.plot(np.log10(Vars),accuracies)
+    plt.show()
