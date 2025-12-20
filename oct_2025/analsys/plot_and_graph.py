@@ -10,7 +10,7 @@ import utils
 from math import e
 from datetime import datetime,date
 from utils import *
-import params
+import oct_2025.main.params as params
 
 run_as_AO=True #!run PIB VS r0_ref from AO
 if run_as_AO:
@@ -41,18 +41,15 @@ def plot_E_and_D(csv_path: str = "./AO_simulation_log.csv"):
     # Keep only relevant rows and normalize once.
     df = df[df[airy_col] > 1].copy()
     df = df[df[airy_col].isin([2, 3, 4])]
-    """
+    
     r0_drop = [
-        0.01, 0.05, 0.03, 0.07, 0.2,
-        0.011, 0.012, 0.013,
-        0.017, 0.018, 0.019, 0.02
+        0.01, 0.05, 0.03, 0.07, 0.2, 0.02,0.014
     ]
-    """
+    df=df[df[r0_col].isin(r0_drop)]
     #df = df[df[r0_col].isin(r0_drop)]
     # Optional per-point exclusions: list of (r0_ref, num_airy)
-    drop_points = [(0.014,2),(0.015,2),(0.017,2),(0.019,2),
-                (0.012,3),(0.014,3),(0.015,3),(0.016,3),(0.017,3)
-        ]
+    drop_points = []
+
     if drop_points:
         mask = ~df.apply(lambda row: (row[r0_col], row[airy_col]) in drop_points, axis=1)
         df = df[mask]
@@ -62,9 +59,15 @@ def plot_E_and_D(csv_path: str = "./AO_simulation_log.csv"):
     df["D_norm"] = df[D_col] / norm
     airy_groups = sorted(df[airy_col].unique())
     # Use a smooth scientific colormap (logical progression in Airy size).
-    cmap = plt.get_cmap("viridis")
-    colors = [cmap(i / max(1, len(airy_groups) - 1)) for i in range(len(airy_groups))]
-
+    dark_colors = [
+    "#000000",  # black
+    "#303030",  # dark gray
+    "#4a1486",  # very dark purple
+    "#283593",  # dark indigo / blue
+    "#00695c",  # dark teal
+    "#b71c1c",  # dark red (still not bright)
+    ]
+    colors = [dark_colors[i % len(dark_colors)] for i in range(len(airy_groups))]
     fig, ax = plt.subplots(figsize=(10, 6))
 
     for color, airy in zip(colors, airy_groups):
@@ -135,6 +138,7 @@ def plot_E_and_D(csv_path: str = "./AO_simulation_log.csv"):
         base_output_dir,
         "AO_effectiveness.png",
     )
+
     fig.savefig(out_path, dpi=300, bbox_inches="tight")
     print(f"✅ Saved E/D offset figure to: {out_path}")
     plt.close(fig)
@@ -170,17 +174,19 @@ def plot_pib_vs_r0_for_column(
         )
 
         # Mean trend: mean over run_number for each r0_ref (per num_airy)
-        means = (
+        stats = (
             group
             .groupby(x_col)[y_col]
-            .mean()
+            .agg(['mean', 'std'])
             .reset_index()
             .sort_values(by=x_col)
         )
+        stats['std'] = stats['std'].fillna(0.0)
 
-        ax.plot(
-            means[x_col],
-            means[y_col],
+        ax.errorbar(
+            stats[x_col],
+            stats['mean'],
+            yerr=stats['std'],
             linewidth=line_width,
         )
 
