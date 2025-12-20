@@ -23,3 +23,5 @@ AO.py
 ../*mp4
 ../response_matrix.mp4
 oct_2025/MP4_files/.*
+*.csv
+*.gmp4
