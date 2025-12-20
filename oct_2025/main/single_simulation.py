@@ -256,7 +256,7 @@ if save_images:
     plt.tight_layout()
 
     # save or show 
-    base_output_dir = 'simulation_output'
+    base_output_dir = "simulagition_output"
     os.makedirs(base_output_dir, exist_ok=True)
     out_path = os.path.join(
         base_output_dir,
@@ -268,4 +268,15 @@ if save_images:
 
 if not Run_test_batch :
     """( wavelength,r0_ref_val,run_num,power_in_bucket_before,total_power_before,precentage_before,total_power_after,precentage_after,conservation_of_energy,num_airy,power_after_AO=None,power_in_bucket_after=1111111):"""
-    utils.update_csv(wavelength=wavelength, r0_ref_val=r0_ref, run_num=run_number,power_in_bucket_before=power0_in_bucket,total_power_before=power0_total,precentage_before=frac0,total_power_after=power1_in_bucket,precentage_after=frac1,conservation_of_energy=Energy_conservation,num_airy=num_airy,power_after_AO=AO_power,power_in_bucket_after=power1_total)
+    utils.update_csv(wavelength=wavelength,
+                      r0_ref_val=r0_ref, 
+                      run_num=run_number,
+                      power_in_bucket_before=power0_in_bucket,
+                      total_power_before=power0_total,
+                      precentage_before=frac0,
+                      total_power_after=power1_in_bucket,
+                      precentage_after=frac1,
+                      conservation_of_energy=Energy_conservation,
+                      num_airy=num_airy,
+                      power_after_AO=AO_power,
+                      power_in_bucket_after=power1_total)

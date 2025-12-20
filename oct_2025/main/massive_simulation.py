@@ -106,7 +106,7 @@ for num_airy in [2,3,4]:
                             "r0_ref": 0.1,  # example value for r0_ref 
                             "save_images": save_images,  # example value for r0_ref
                             "TurbulencLayer": True,
-                            "USE_AO": True, # !Will te a long run to run if True
+                            "USE_AO": True, # !Will take a long run to run if True
                             "num_airy": num_airy,
                             "r0_ref_list":r0_ref_list,
                             "Add_Stellar_Noise":Add_Stellar_Noise,

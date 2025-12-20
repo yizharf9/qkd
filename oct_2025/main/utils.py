@@ -792,7 +792,7 @@ def AO(num_airy,save_images,run_number,r0_ref_list=[],single_r0=None):
             print(f"✅ Saved combined figure to: {out_path}")
         plt.close()    
 
-        output_path ="AO_simulation_log.csv"
+        output_path ="/AO/AO_simulation_log.csv"
         df_log=pd.DataFrame(log_rows)
     if os.path.exists(output_path):
         # לקרוא את הקובץ הקיים ולהוסיף לו את השורות החדשות
