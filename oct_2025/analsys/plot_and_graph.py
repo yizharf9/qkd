@@ -4,26 +4,29 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))  # adds oct_2025 to sys.path
+
 from hcipy import *
 import numpy as np
-import utils
+import main.utils as utils
 from math import e
 from datetime import datetime,date
-from utils import *
-import oct_2025.main.params as params
+from main.utils import *
+import main.params as params
 
 run_as_AO=True #!run PIB VS r0_ref from AO
 if run_as_AO:
-    path_file="./AO_simulation_log.csv"
+    path_file="Data/AO_simulation_log.csv"
 else:
-    path_file="./massive_output.csv"
+    path_file="Data/massive_output.csv"
 def check_axis(run_Cn2: bool,r0_col) -> str:
     if run_Cn2:
         pass # switch to Cn2 for x axis
     else:
         r0_col=r0_col
     return r0_col
-def plot_E_and_D(csv_path: str = "./AO_simulation_log.csv"):
+def plot_E_and_D(csv_path: str = "Data/AO_simulation_log.csv"):
     """
     Plot normalized E (without correction) and D (with correction) on
     a single figure. Style is similar to the original version,
