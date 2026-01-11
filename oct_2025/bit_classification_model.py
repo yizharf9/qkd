@@ -255,7 +255,7 @@ if __name__ == "__main__":
 
         threshold = clf.tree_.threshold[0]
         plt.axhline(y=threshold, color='blue', linestyle='--', label=f'Decision Threshold ({threshold:.2f})')
-        plt.title(f"Classification Accuracy (Green=Correct, Red=Wrong), BER : {1-acc :.1%}")
+        plt.title(f"Classification Accuracy (Green=Correct, Red=Wrong), BER : {1-acc :.1%}\n G = {Gain} , Var = {Var}")
         plt.xlabel("Time Stamp")
         plt.ylabel("Signal Value [Watt]")
         plt.legend()
@@ -268,18 +268,14 @@ if __name__ == "__main__":
     N = 5
     accuracies = []
     Vars = np.logspace(-8,-1,num)
-    Gains = np.logspace(-8,-1,num)
+    Gains = np.logspace(-4,0,4)
     
-    for i in range(len(Vars)):
-        avg = 0
-        for i in range(N):
-            _,data = create_bit_stream(Vars[i],N=100000)
-            # print(data)
-            clf,acc = set_decision_rule(data)
-            # print(f"var = {Vars[i]}")
-            # print(f"acc = {acc}\n")
-            avg += acc
-        accuracies.append(avg/N)
+    for var in Vars:
+        for gain in Gains:    
+            avg = 0
+            print(f"var = {var}")
+            plot_decision_rule(Var = var , Gain = gain)
+    
     # print(len(accuracies))
     plt.plot(np.log10(Vars),accuracies)
     plt.show()
