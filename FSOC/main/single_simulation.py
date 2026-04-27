@@ -1,4 +1,5 @@
 import os
+import csv
 from params import *
 import utils
 import numpy as np
@@ -13,16 +14,12 @@ from scipy.ndimage import sum as scipy_sum
 from tqdm.auto import tqdm
 import time
 import datetime
+from realtime_profiler import init_profiler, get_profiler, mark_stage, next_iteration, print_summary, save_timing_report
+from utils import OptimizedFocalPlane
 
 # ============================================================================
 # Helper: Poisson noise (fallback if not defined elsewhere)
 # ============================================================================
-def large_poisson(x):
-    """Apply Poisson noise to array, with safe maximum."""
-    # Cap input to avoid overflow in Poisson sampler (max ~1e7)
-    x_safe = np.minimum(np.maximum(x, 0), 1e6)
-    return np.random.poisson(x_safe).astype(float)
-
 # ----------------------------- Directory Check -----------------------------
 utils.check_dir()
 # ----------------------------- Parameters -----------------------------
@@ -143,32 +140,15 @@ wf0.total_power=1.0
 psf0 = prop.forward(wf0).power  # unaberrated PSF (relative units)
 phase0 = prop.forward(wf0).phase  # unaberrated PSF (relative unitxs)
 
-# ---------- 4) Single-layer turbulence ----------
-                                    # [m/s] 
+# ---------- 4) Atmospheric turbulence (single or multi-layer) ----------
 
-# HCIPy 0.7.0 API fallback
 if TurbulencLayer is True:
-    L0 = 40.0          # [m]
-    tau0 = 5e-3        # [s]
-    lam_ref = 500e-9   # [m]
-#r0 = r0_ref * (wavelength / lam_ref) ** (6.0 / 5.0)    
-    r0 = r0_ref * (wavelength / lam_ref) ** (6.0 / 5.0)    
-    Cn2 = Cn_squared_from_fried_parameter(r0_ref, lam_ref)    # [m^(-2/3)]
-    v = 0.314 * r0 / tau0 
-    try:
-        layer = InfiniteAtmosphericLayer(pupil_grid, Cn2, L0, v)
-    except TypeError:
-        layer = InfiniteAtmosphericLayer(Cn2, L0, v)
-    wf1=layer(wf0)
+    layer = utils.create_atmosphere(pupil_grid, r0_ref, wavelength, lam_ref, tau0, L0, config)
+    wf1 = layer(wf0)
 else:
-    r0_ref=1
-    try:
-        layer = InfiniteAtmosphericLayer(pupil_grid,1e-23, 1, 0)
-    except TypeError:
-        layer = InfiniteAtmosphericLayer(1e-23, 1, 0)
-        r0_ref=1
-    wf1=layer(wf0)
-    wf1=wf0           # wavefront AFTER turbulence
+    r0_ref = 1
+    layer = utils.create_atmosphere(pupil_grid, r0_ref, wavelength, lam_ref, tau0, L0, config)
+    wf1 = wf0  # no turbulence: use clean wavefront
 psf1 = prop(wf1).power           # instantaneous PSF with turbulence
 phase1 = prop(wf1).phase           # instantaneous PSF with turbulence
 Wf_in_focal=prop(wf1)
@@ -246,13 +226,13 @@ if USE_AO:
         num_modes=64,
         probe_amp_factor=0.1,
         rcond=1e-3,
-        delta_t=1e-3,
-        num_iterations=50,  # Reduced back to 50 - system diverges after ~50 with gain=0.02
+        delta_t=1e-4,
+        num_iterations=200,
         burn_in_iterations=5,
-        gain=0.02,  # Conservative gain - negative sign correct, need slow convergence
-        leakage=0.02,  # Increased damping to prevent oscillation
-        zero_magnitude_flux=3.9e10,
-        stellar_magnitude=5.0,
+        gain=0.03,  # Lower gain for stability with higher num_modes
+        leakage=0.01,  # Increased damping to prevent oscillation
+        zero_magnitude_flux=3.9e8,
+        stellar_magnitude=12.0,
         coro_inner_radius_lamD=4.0,
         base_output_dir="simulation_output",
         csv_output_path="Data/AO_simulation_log.csv",
@@ -320,15 +300,14 @@ if USE_AO:
     # Loop over r0 values
     for r0 in r0_list:
         fried_parameter = r0
-        velocity = 0.314 * fried_parameter / tau0
-        Cn2 = Cn_squared_from_fried_parameter(fried_parameter, 500e-9)
-        
-        try:
-            layer_ao = InfiniteAtmosphericLayer(pupil_grid, Cn2, L0, velocity)
-        except TypeError:
-            layer_ao = InfiniteAtmosphericLayer(Cn2, L0, velocity)
-        
-        layer_ao.reset()
+        layer_ao = utils.create_atmosphere(pupil_grid, fried_parameter, wavelength, lam_ref, tau0, L0, config)
+
+        # Reset atmosphere state
+        if hasattr(layer_ao, 'layers'):
+            for l in layer_ao.layers:
+                l.reset()
+        else:
+            layer_ao.reset()
         state.deformable_mirror.flatten()
         
         # Data logs for this r0
@@ -342,52 +321,61 @@ if USE_AO:
         print(f"  r0 = {fried_parameter:.4g} m ({fried_parameter*1e3:.3f} mm)")
         print("  Running AO loop...")
         print(f"Number Of itterations: {cfg.num_iterations}")
+        
+        # Initialize optimized focal plane computation (with JIT)
+        print("  Initializing optimized focal plane (Numba JIT)...")
+        focal_optimizer = OptimizedFocalPlane(state.focal_grid, fiber_radius_um=9e-6)
+        
+        # Initialize profiler for real-time timing breakdown
+        profiler = init_profiler(num_iterations=cfg.num_iterations)
+        
         for timestep in tqdm(range(cfg.num_iterations)):
             layer_ao.t = timestep * cfg.delta_t
             
             # ================================================================
             # PAM MODULATION: vary wavefront power per timestep
             # ================================================================
-            # Temporarily disable PAM for debugging
-            # pam_idx = timestep % len(pam_levels)
-            # pam_factor = pam_levels[pam_idx]
-            pam_factor = 1.0  # Keep constant power for now
-            modulated_power = state.wf_wfs.total_power * pam_factor  # apply PAM
-            state.wf_wfs.total_power = modulated_power
+            with mark_stage("1. PAM Modulation"):
+                # Temporarily disable PAM for debugging
+                # pam_idx = timestep % len(pam_levels)
+                # pam_factor = pam_levels[pam_idx]
+                pam_factor = 1.0  # Keep constant power for now
+                modulated_power = state.wf_wfs.total_power * pam_factor  # apply PAM
+                state.wf_wfs.total_power = modulated_power
             
             # ================================================================
             # Propagate through atmosphere and DM
             # ================================================================
-            wf_wfs_after_atmos = layer_ao(state.wf_wfs)
-            wf_wfs_after_dm = state.deformable_mirror(wf_wfs_after_atmos)
+            with mark_stage("2. WFS Propagation (layer_ao)"):
+                wf_wfs_after_atmos = layer_ao(state.wf_wfs)
+            
+            with mark_stage("3. DM Application"):
+                wf_wfs_after_dm = state.deformable_mirror(wf_wfs_after_atmos)
             
             # WFS camera readout
-            wf_wfs_on_sh = state.shwfs(state.magnifier(wf_wfs_after_dm))
-            state.camera.integrate(wf_wfs_on_sh, cfg.delta_t)
-            wfs_image_raw = state.camera.read_out()
+            with mark_stage("4. SH Sensing (shwfs)"):
+                wf_wfs_on_sh = state.shwfs(state.magnifier(wf_wfs_after_dm))
+                state.camera.integrate(wf_wfs_on_sh, cfg.delta_t)
+                wfs_image_raw = state.camera.read_out()
             
-            # Apply Poisson noise (convert to array, apply noise, then reconstruct as Field)
-            wfs_image_array = large_poisson(np.asarray(wfs_image_raw)).astype("float")
+            with mark_stage("5. Poisson Noise"):
+                # Apply Poisson noise (convert to array, apply noise, then reconstruct as Field)
+                # Multi-layer atmospheres with scintillation can produce extreme intensity
+                # spikes from Fresnel focusing. Clip to a safe range for Poisson sampling.
+                raw_arr = np.nan_to_num(np.asarray(wfs_image_raw), nan=0.0, posinf=0.0, neginf=0.0)
+                raw_arr = np.clip(raw_arr, 0.0, 1e12)
+                wfs_image_array = large_poisson(raw_arr).astype("float")
+                
+                # Reconstruct as HCIPy Field with the SAME grid as the camera/shwfs
+                # This is critical: the WFS image must use the SAME grid as used by the estimator
+                wfs_image = Field(wfs_image_array, wfs_image_raw.grid)
             
-            # Reconstruct as HCIPy Field with the SAME grid as the camera/shwfs
-            # This is critical: the WFS image must use the SAME grid as used by the estimator
-            wfs_image = Field(wfs_image_array, wfs_image_raw.grid)
-            
-            # Science focal plane
+                # Science focal plane (most expensive operation!)
             wf_focal_plane = state.propagator(
-                state.deformable_mirror(layer_ao(state.wf_wfs))
-            )
-            
-            # ================================================================
-            # MAIN DATA: Power in focal (9µm fiber PIB)
-            # ================================================================
-            # Compute fiber coupling (9µm radius)
-            focal_power_map = wf_focal_plane.power
-            x_focal = state.focal_grid.x
-            y_focal = state.focal_grid.y
-            r_focal = np.sqrt(x_focal**2 + y_focal**2)
-            fiber_mask = r_focal <= 9e-6  # 9 µm radius
-            power_in_focal = float(np.sum(focal_power_map[fiber_mask]))
+            state.deformable_mirror(layer_ao(state.wf_wfs))
+                )
+                # Use optimized JIT-compiled fiber coupling calculation
+            power_in_focal = focal_optimizer.compute_pib_jit(wf_focal_plane)
             
             # ================================================================
             # DEBUG DATA: COG of Shack-Hartmann, DM stats
@@ -435,55 +423,67 @@ if USE_AO:
             # ================================================================
             # WFS CONTROL & DM UPDATE - WITH DIAGNOSTICS
             # ================================================================
-            # Estimate slopes from WFS image
-            slopes = state.shwfse.estimate([wfs_image])
+            with mark_stage("6. Slope Estimation"):
+                # Estimate slopes from WFS image
+                slopes = state.shwfse.estimate([wfs_image])
+                slopes = np.nan_to_num(slopes, nan=0.0, posinf=0.0, neginf=0.0)
             
-            # Subtract reference slopes (differential measurement)
-            slopes_residual = slopes - state.slopes_ref
-            slopes_residual_ravel = slopes_residual.ravel()
-            
-            # Get current DM state BEFORE update
-            dm_actuators_before = np.asarray(state.deformable_mirror.actuators).copy()
-            dm_rms_before = np.sqrt(np.mean(dm_actuators_before**2))
-            
-            # Compute modal commands via reconstruction matrix
-            modal_commands = state.reconstruction_matrix.dot(slopes_residual_ravel)
-            
-            # **CORRECTED SIGN**: Negative sign is correct for this system
-            state.deformable_mirror.actuators = (
-                (1 - cfg.leakage) * state.deformable_mirror.actuators
-                - cfg.gain * modal_commands  # NEGATIVE SIGN - corrected
-            )
-            
-            # Clip DM actuators to prevent runaway (5 micrometers max)
-            dm_max_allowed = 5e-6
-            state.deformable_mirror.actuators = np.clip(
-                state.deformable_mirror.actuators,
-                -dm_max_allowed,
-                dm_max_allowed
-            )
-            
-            # Get DM state AFTER update for diagnostics
-            dm_actuators_after = np.asarray(state.deformable_mirror.actuators)
-            dm_rms_after = np.sqrt(np.mean(dm_actuators_after**2))
-            
-            # Compute diagnostics
-            residual_rms = np.linalg.norm(slopes_residual_ravel) / len(slopes_residual_ravel)
-            modal_cmd_rms = np.linalg.norm(modal_commands) / len(modal_commands)
+            with mark_stage("7. Reconstruction & DM Update"):
+                # Subtract reference slopes (differential measurement)
+                slopes_residual = slopes - state.slopes_ref
+                slopes_residual_ravel = slopes_residual.ravel()
+                
+                # Get current DM state BEFORE update
+                dm_actuators_before = np.asarray(state.deformable_mirror.actuators).copy()
+                dm_rms_before = np.sqrt(np.mean(dm_actuators_before**2))
+                
+                # Compute modal commands via reconstruction matrix
+                modal_commands = state.reconstruction_matrix.dot(slopes_residual_ravel)
+                modal_commands = np.nan_to_num(modal_commands, nan=0.0, posinf=0.0, neginf=0.0)
+                
+                # **CORRECTED SIGN**: Negative sign is correct for this system
+                state.deformable_mirror.actuators = (
+                    (1 - cfg.leakage) * state.deformable_mirror.actuators
+                    - cfg.gain * modal_commands  # NEGATIVE SIGN - corrected
+                )
+
+                state.deformable_mirror.actuators = np.nan_to_num(
+                    state.deformable_mirror.actuators, nan=0.0, posinf=0.0, neginf=0.0
+                )
+                
+                # Clip DM actuators to prevent runaway (5 micrometers max)
+                dm_max_allowed = 5e-6
+                state.deformable_mirror.actuators = np.clip(
+                    state.deformable_mirror.actuators,
+                    -dm_max_allowed,
+                    dm_max_allowed
+                )
+                
+                # Get DM state AFTER update for diagnostics
+                dm_actuators_after = np.asarray(state.deformable_mirror.actuators)
+                dm_rms_after = np.sqrt(np.mean(dm_actuators_after**2))
+                
+                # Compute diagnostics
+                residual_rms = np.linalg.norm(slopes_residual_ravel) / len(slopes_residual_ravel)
+                modal_cmd_rms = np.linalg.norm(modal_commands) / len(modal_commands)
             
             # Log diagnostic data
-            debug_data_list.append({
-                "timestep": timestep,
-                "cog_x": cog_x,
-                "cog_y": cog_y,
-                "dm_mean": float(np.mean(dm_actuators_after)),
-                "dm_max": float(np.max(dm_actuators_after)),
-                "dm_min": float(np.min(dm_actuators_after)),
-                "dm_rms_before": float(dm_rms_before),
-                "dm_rms_after": float(dm_rms_after),
-                "slopes_residual_rms": float(residual_rms),
-                "modal_cmd_rms": float(modal_cmd_rms),
-            })
+            with mark_stage("9. Data Logging"):
+                debug_data_list.append({
+                    "timestep": timestep,
+                    "cog_x": cog_x,
+                    "cog_y": cog_y,
+                    "dm_mean": float(np.mean(dm_actuators_after)),
+                    "dm_max": float(np.max(dm_actuators_after)),
+                    "dm_min": float(np.min(dm_actuators_after)),
+                    "dm_rms_before": float(dm_rms_before),
+                    "dm_rms_after": float(dm_rms_after),
+                    "slopes_residual_rms": float(residual_rms),
+                    "modal_cmd_rms": float(modal_cmd_rms),
+                })
+            
+            # Mark end of iteration to print timing summary
+            next_iteration()
         
         # ====================================================================
         # SAVE CSVs for this r0
@@ -499,6 +499,10 @@ if USE_AO:
         
         print(f"  ✅ Saved: {main_csv}")
         print(f"  ✅ Saved: {debug_csv}")
+        
+        # Print and save timing reports
+        print_summary()
+        save_timing_report(output_dir)
         
         # ====================================================================
         # SAVE CORRECTION COMPARISON (before/after focal plane images)
@@ -547,13 +551,129 @@ if USE_AO:
     print(f"\n✨ AO complete!")
     print(f"AO correction took {datetime.timedelta(seconds=time.time()-s_time)} (hh:mm:ss)")
 
+    # ---------- QKD: BB84 over the FSOC channel ----------
+    if qkd_config.get("enabled", False):
+        from channel_metrics import extract_metrics
+        from bb84 import BB84Simulator
+
+        # Residual pupil wavefront after AO
+        wf_pupil_residual = state.deformable_mirror(layer_ao(state.wf_wfs))
+
+        # Diagnostics: inspect power in fiber mask and residual phase stats
+        focal_power = np.asarray(wf_focal_plane.power)
+        residual_phase = np.asarray(wf_pupil_residual.phase)
+        fiber_mask = (np.sqrt(state.focal_grid.x**2 + state.focal_grid.y**2) <= alpha)
+        fiber_power = float(np.sum(focal_power[fiber_mask])) if fiber_mask.any() else 0.0
+        print("[QKD diagnostics] focal power min/max:", np.nanmin(focal_power), np.nanmax(focal_power))
+        print("[QKD diagnostics] fiber power sum:", fiber_power, "mask pixels:", int(np.sum(fiber_mask)))
+        print("[QKD diagnostics] residual phase min/max:", np.nanmin(residual_phase), np.nanmax(residual_phase))
+        print("[QKD diagnostics] residual phase finite ratio:", float(np.isfinite(residual_phase).mean()))
+
+        metrics = extract_metrics(
+            wf_focal_corrected=wf_focal_plane,
+            psf_diffraction_limited=psf0,
+            wf_pupil_residual=wf_pupil_residual,
+            aperture_mask=ap,
+            focal_grid=state.focal_grid,
+            fiber_radius=alpha,
+            total_power_sent=1.0,
+            zero_magnitude_flux=zero_magnitude_flux,
+            stellar_magnitude=stellar_magnitude,
+        )
+
+        bb84 = BB84Simulator(
+            channel=metrics,
+            num_qubits=qkd_config.get("num_qubits", 10000),
+            error_correction_efficiency=qkd_config.get("error_correction_efficiency", 1.16),
+        )
+        bb84_result = bb84.run()
+        print(bb84.summary(bb84_result))
+
+        # Persist BB84 results alongside AO outputs
+        qkd_csv_path = os.path.join(output_dir, "bb84_results.csv")
+        write_header = not os.path.exists(qkd_csv_path)
+        with open(qkd_csv_path, "a", newline="") as csv_file:
+            writer = csv.writer(csv_file)
+            if write_header:
+                writer.writerow([
+                    "num_sent",
+                    "raw_key_length",
+                    "sifted_key_length",
+                    "qber",
+                    "secret_key_rate",
+                    "secure",
+                    "eta",
+                    "strehl_ratio",
+                    "phase_variance",
+                    "depolarizing_prob",
+                    "background_counts",
+                ])
+            writer.writerow([
+                bb84_result.num_sent,
+                bb84_result.raw_key_length,
+                bb84_result.sifted_key_length,
+                bb84_result.qber,
+                bb84_result.secret_key_rate,
+                int(bb84_result.secure),
+                metrics.eta,
+                metrics.strehl_ratio,
+                metrics.phase_variance,
+                metrics.depolarizing_prob,
+                metrics.background_counts,
+            ])
+
+        # --- Save QKD results to disk ---
+        import json
+        qkd_dir = os.path.join(output_dir, "qkd")
+        os.makedirs(qkd_dir, exist_ok=True)
+
+        # 1. Summary JSON (human + machine readable)
+        qkd_summary = {
+            "channel": {
+                "eta": metrics.eta,
+                "strehl_ratio": metrics.strehl_ratio,
+                "phase_variance": metrics.phase_variance,
+                "depolarizing_prob": metrics.depolarizing_prob,
+                "background_counts": metrics.background_counts,
+            },
+            "bb84": {
+                "num_sent": bb84_result.num_sent,
+                "raw_key_length": bb84_result.raw_key_length,
+                "sifted_key_length": bb84_result.sifted_key_length,
+                "qber": bb84_result.qber,
+                "secret_key_rate": bb84_result.secret_key_rate,
+                "secure": bb84_result.secure,
+            },
+        }
+        with open(os.path.join(qkd_dir, "qkd_results.json"), "w") as f:
+            json.dump(qkd_summary, f, indent=2)
+
+        # 2. Raw sifted keys (Alice & Bob)
+        np.save(os.path.join(qkd_dir, "alice_sifted_key.npy"), bb84_result.alice_sifted_key)
+        np.save(os.path.join(qkd_dir, "bob_sifted_key.npy"), bb84_result.bob_sifted_key)
+
+        # 3. Human-readable summary
+        with open(os.path.join(qkd_dir, "qkd_summary.txt"), "w") as f:
+            f.write(bb84.summary(bb84_result))
+
+        print(f"  💾 QKD results saved to: {qkd_dir}/")
+
 else:
     wf_focal_plane=prop(wf1)
     AO_power=0.0
 # ---------- 8) Optional: overlay circle on both PSFs ----------
 if save_images:
     initial_psf=wf0.power
-    phase_screen = layer.phase_for(wavelength)          # Field on the pupil grid (radians)
+    # Get phase screen (works for both single and multi-layer).
+    # MultiLayerAtmosphere with scintillation cannot unwrap phase, so fall back
+    # to summing per-layer phase contributions.
+    try:
+        phase_screen = layer.phase_for(wavelength)
+    except (ValueError, AttributeError):
+        if hasattr(layer, 'layers'):
+            phase_screen = sum(l.phase_for(wavelength) for l in layer.layers)
+        else:
+            phase_screen = np.angle(layer(wf0).electric_field)
     power_screen = np.abs(np.exp(1j*phase_screen))**2          #! to be changed to psf
 
     # pupil-plane extent (meters -> mm for readability)
@@ -588,7 +708,7 @@ if save_images:
     plt.tight_layout()
 
     # save or show 
-    base_output_dir = "simulagition_output"
+    base_output_dir = "simulation_output"
     os.makedirs(base_output_dir, exist_ok=True)
     out_path = os.path.join(
         base_output_dir,
