@@ -1,0 +1,10 @@
+Parameter,Value
+num_modes,64.0
+probe_amp_factor,0.1
+rcond,0.001
+f_number,50.0
+num_lenslets,30.0
+wavelength,1.55e-06
+telescope_diameter,0.3
+gain,0.01
+leakage,0.02

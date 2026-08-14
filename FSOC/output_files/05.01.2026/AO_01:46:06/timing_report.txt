@@ -1,0 +1,42 @@
+================================================================================
+TIMING ANALYSIS REPORT (50 iterations)
+================================================================================
+
+Per-Stage Statistics (milliseconds):
+Stage                                 Min        Avg        Max      Total
+----------------------------------------------------------------------
+1. PAM Modulation                    0.69        1.32        6.86       66.04
+2. WFS Propagation (layer_ao)        0.85        0.98        1.13       48.76
+3. DM Application                    4.16       18.16       63.83      907.77
+4. SH Sensing (shwfs)                3.50        5.42        9.85      270.98
+5. Poisson Noise                     2.71        2.80        3.40      139.87
+6. Focal Plane Propagation          48.24      181.48      327.18     9073.83
+7. Slope Estimation                  1.83        1.93        3.58       96.61
+8. Reconstruction & DM Update        0.97       15.06       48.29      752.81
+9. Data Logging                      0.01        0.01        0.03        0.66
+----------------------------------------------------------------------
+
+Iteration Timing (milliseconds):
+  Average:      227.1
+  Min:           76.4
+  Max:          358.9
+  Median:       237.0
+
+Loop Rate:
+  Achieved:        4.40 Hz
+  Target:    1000.00 Hz
+  Gap:           995.60 Hz (227× too slow)
+
+Bottleneck Analysis (sorted by average time):
+----------------------------------------------------------------------
+1. 6. Focal Plane Propagation       181.48 ms ( 79.9%)
+2. 3. DM Application                 18.16 ms (  8.0%)
+3. 8. Reconstruction & DM Update      15.06 ms (  6.6%)
+4. 4. SH Sensing (shwfs)              5.42 ms (  2.4%)
+5. 5. Poisson Noise                   2.80 ms (  1.2%)
+6. 7. Slope Estimation                1.93 ms (  0.9%)
+7. 1. PAM Modulation                  1.32 ms (  0.6%)
+8. 2. WFS Propagation (layer_ao)       0.98 ms (  0.4%)
+9. 9. Data Logging                    0.01 ms (  0.0%)
+
+================================================================================

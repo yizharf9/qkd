@@ -1,0 +1,40 @@
+================================================================================
+TIMING ANALYSIS REPORT (50 iterations)
+================================================================================
+
+Per-Stage Statistics (milliseconds):
+Stage                                 Min        Avg        Max      Total
+----------------------------------------------------------------------
+1. PAM Modulation                    0.61        1.68        7.14       83.82
+2. WFS Propagation (layer_ao)        3.30        5.37        6.39      268.65
+3. DM Application                    4.01       15.08       32.68      753.79
+4. SH Sensing (shwfs)                2.68        6.94      100.41      346.91
+5. Poisson Noise                     1.02        1.07        1.44       53.72
+6. Slope Estimation                  1.85        1.91        2.35       95.74
+7. Reconstruction & DM Update        1.02       11.56       30.34      577.84
+9. Data Logging                      0.01        0.01        0.02        0.55
+----------------------------------------------------------------------
+
+Iteration Timing (milliseconds):
+  Average:       43.6
+  Min:           21.6
+  Max:          154.7
+  Median:        39.2
+
+Loop Rate:
+  Achieved:       22.93 Hz
+  Target:    1000.00 Hz
+  Gap:           977.07 Hz (44× too slow)
+
+Bottleneck Analysis (sorted by average time):
+----------------------------------------------------------------------
+1. 3. DM Application                 15.08 ms ( 34.6%)
+2. 7. Reconstruction & DM Update      11.56 ms ( 26.5%)
+3. 4. SH Sensing (shwfs)              6.94 ms ( 15.9%)
+4. 2. WFS Propagation (layer_ao)       5.37 ms ( 12.3%)
+5. 6. Slope Estimation                1.91 ms (  4.4%)
+6. 1. PAM Modulation                  1.68 ms (  3.8%)
+7. 5. Poisson Noise                   1.07 ms (  2.5%)
+8. 9. Data Logging                    0.01 ms (  0.0%)
+
+================================================================================

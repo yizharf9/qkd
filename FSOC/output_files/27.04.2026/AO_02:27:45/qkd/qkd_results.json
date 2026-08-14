@@ -1,0 +1,17 @@
+{
+  "channel": {
+    "eta": 1.0,
+    "strehl_ratio": 1.0,
+    "phase_variance": 0.2906932980278098,
+    "depolarizing_prob": 0.1352775140472413,
+    "background_counts": 0.039001
+  },
+  "bb84": {
+    "num_sent": 500,
+    "raw_key_length": 500,
+    "sifted_key_length": 239,
+    "qber": 0.058577405857740586,
+    "secret_key_rate": 0.15248659167891282,
+    "secure": true
+  }
+}
