@@ -1,0 +1,17 @@
+{
+  "channel": {
+    "eta": NaN,
+    "strehl_ratio": NaN,
+    "phase_variance": NaN,
+    "depolarizing_prob": NaN,
+    "background_counts": 0.039001
+  },
+  "bb84": {
+    "num_sent": 500,
+    "raw_key_length": 500,
+    "sifted_key_length": 251,
+    "qber": 0.0,
+    "secret_key_rate": 0.0,
+    "secure": true
+  }
+}

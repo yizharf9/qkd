@@ -1,0 +1,2 @@
+num_sent,raw_key_length,sifted_key_length,qber,secret_key_rate,secure,eta,strehl_ratio,phase_variance,depolarizing_prob,background_counts
+500,500,248,0.35080645161290325,0.0,0,1.0,1.0,2.828745301053967,0.7569219394818838,0.039001

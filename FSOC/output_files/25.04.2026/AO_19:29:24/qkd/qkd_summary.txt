@@ -1,0 +1,14 @@
+==================================================
+BB84 QKD Simulation Results
+==================================================
+Channel transmittance (eta): 1.0000
+Channel Strehl ratio:        1.0000
+Phase variance:              3.7809 rad^2
+Depolarizing probability:    0.848994
+--------------------------------------------------
+Qubits sent:                 500
+Sifted key length:           248
+QBER:                        0.4274 (42.74%)
+Secret key rate (per pulse): 0.000000
+Secure (QBER < 11%):         NO
+==================================================

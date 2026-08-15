@@ -1,0 +1,9 @@
+.venv/*
+
+# Build / OS junk
+__pycache__/
+*.pyc
+*.nbc
+*.nbi
+.DS_Store
+.vscode/
